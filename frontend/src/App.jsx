@@ -1,2342 +1,329 @@
-import { useState, useCallback } from "react";
+import React, { useState } from 'react';
 
-
-// ============================================================
-// CONFIGURATION
-// ============================================================
-
-const SEQUENCE_LENGTH = 101;
-
-const DEFAULT_API_URL = "http://localhost:8000";
-
-
-// ============================================================
-// KNOWN BIOLOGICAL MOTIFS
-// ============================================================
-
-const KNOWN_MOTIFS = {
-  TATA_BOX: "TATAAA",
-  GC_BOX: "GGGCGG",
-  CAAT_BOX: "CCAAT",
+const NUCLEOTIDE_THEMES = {
+  A: { bg: 'rgba(16, 185, 129, 0.15)', border: '#10b981', text: '#34d399', bar: '#10b981' },
+  C: { bg: 'rgba(59, 130, 246, 0.15)', border: '#3b82f6', text: '#60a5fa', bar: '#3b82f6' },
+  G: { bg: 'rgba(245, 158, 11, 0.15)', border: '#f59e0b', text: '#fbbf24', bar: '#f59e0b' },
+  T: { bg: 'rgba(239, 68, 68, 0.15)', border: '#ef4444', text: '#f87171', bar: '#ef4444' }
 };
 
-
-// ============================================================
-// DNA BASE COLORS
-// ============================================================
-
-const BASE_COLORS = {
-  A: "#4FD67A",
-  T: "#FF6B6B",
-  C: "#5B9DFF",
-  G: "#FFC857",
-};
-
-
-// ============================================================
-// RANDOM DNA SEQUENCE GENERATOR
-// ============================================================
-
-function randomSeq(length) {
-
-  const bases = ["A", "T", "C", "G"];
-
-  let sequence = "";
-
-  for (let i = 0; i < length; i++) {
-
-    const randomIndex = Math.floor(
-      Math.random() * bases.length
-    );
-
-    sequence += bases[randomIndex];
-  }
-
-  return sequence;
-}
-
-
-// ============================================================
-// SEQUENCE PREVIEW
-// ============================================================
-
-function SequencePreview({ sequence }) {
-
-  if (!sequence) {
-
-    return (
-      <span className="placeholder">
-        sequence preview will render here
-      </span>
-    );
-  }
-
-  return (
-    <>
-      {sequence.split("").map((base, index) => (
-
-        <span
-          key={index}
-          style={{
-            color:
-              BASE_COLORS[base] || "#E8ECF1"
-          }}
-        >
-          {base}
-        </span>
-
-      ))}
-    </>
-  );
-}
-
-
-// ============================================================
-// PROBABILITY GAUGE
-// ============================================================
-
-function Gauge({ probability }) {
-
-  const percentage = Math.round(
-    probability * 1000
-  ) / 10;
-
-  const radius = 54;
-
-  const circumference =
-    2 * Math.PI * radius;
-
-  const offset =
-    circumference * (1 - probability);
-
-
-  let color = "#7C8798";
-
-  if (probability >= 0.8) {
-
-    color = "#7DE0E6";
-
-  } else if (probability >= 0.5) {
-
-    color = "#FFC857";
-  }
-
-
-  return (
-    <div className="gauge">
-
-      <svg
-        width="140"
-        height="140"
-        viewBox="0 0 140 140"
-      >
-
-        {/* Background circle */}
-
-        <circle
-          cx="70"
-          cy="70"
-          r={radius}
-          fill="none"
-          stroke="#232B38"
-          strokeWidth="10"
-        />
-
-
-        {/* Probability arc */}
-
-        <circle
-          cx="70"
-          cy="70"
-          r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth="10"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          transform="rotate(-90 70 70)"
-          className="gauge-arc"
-        />
-
-
-        {/* Percentage */}
-
-        <text
-          x="70"
-          y="65"
-          textAnchor="middle"
-          className="gauge-pct"
-          fill={color}
-        >
-          {percentage}%
-        </text>
-
-
-        {/* Label */}
-
-        <text
-          x="70"
-          y="84"
-          textAnchor="middle"
-          className="gauge-label"
-        >
-          binding
-        </text>
-
-      </svg>
-
-    </div>
-  );
-}
-
-
-// ============================================================
-// CNN SALIENCY VISUALIZATION
-// ============================================================
-
-function SaliencyTrack({
-  saliency,
-  sequence
-}) {
-
-  if (
-    !saliency ||
-    saliency.length === 0
-  ) {
-
-    return null;
-  }
-
-
-  return (
-    <div className="track-wrap">
-
-      <div className="track-label">
-
-        CNN gradient saliency
-
-      </div>
-
-
-      <div className="track">
-
-        {saliency.map(
-          (value, index) => {
-
-            const base =
-              sequence[index] || "N";
-
-
-            const baseColor =
-              BASE_COLORS[base] ||
-              "#4A5364";
-
-
-            const height =
-              Math.max(
-                3,
-                Math.round(
-                  value * 74
-                )
-              );
-
-
-            const opacity =
-              0.3 + value * 0.7;
-
-
-            return (
-              <div
-                key={index}
-                className="track-bar"
-                title={
-                  `${base} | Position ${index + 1} | Saliency ${value}`
-                }
-                style={{
-                  height: `${height}px`,
-                  background: baseColor,
-                  opacity: opacity,
-                  animationDelay:
-                    `${Math.min(
-                      index * 4,
-                      600
-                    )}ms`
-                }}
-              />
-            );
-          }
-        )}
-
-      </div>
-
-
-      <div className="ruler">
-
-        <span>
-          Position 1
-        </span>
-
-        <span>
-          Position {sequence.length}
-        </span>
-
-      </div>
-
-    </div>
-  );
-}
-
-
-// ============================================================
-// MAIN APPLICATION
-// ============================================================
+const MOTIF_POOL = [
+  { name: 'TATA_BOX', seq: 'TATAAA' },
+  { name: 'GC_BOX', seq: 'GGGCGG' },
+  { name: 'CAAT_BOX', seq: 'CCAAT' }
+];
 
 export default function App() {
+  const [sequence, setSequence] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
-  // ----------------------------------------------------------
-  // STATE
-  // ----------------------------------------------------------
-
-  const [
-    sequence,
-    setSequence
-  ] = useState("");
-
-
-  const [
-    apiUrl,
-    setApiUrl
-  ] = useState(
-    DEFAULT_API_URL
-  );
-
-
-  const [
-    loading,
-    setLoading
-  ] = useState(false);
-
-
-  const [
-    error,
-    setError
-  ] = useState("");
-
-
-  const [
-    result,
-    setResult
-  ] = useState(null);
-
-
-  // ==========================================================
-  // INSERT EXAMPLE
-  // ==========================================================
-
-  const insertExample = (type) => {
-
-    let motif = "";
-
-
-    // --------------------------------------------------------
-    // Select motif
-    // --------------------------------------------------------
-
-    if (type === "tata") {
-
-      motif =
-        KNOWN_MOTIFS.TATA_BOX;
-
-    }
-
-    else if (type === "gc") {
-
-      motif =
-        KNOWN_MOTIFS.GC_BOX;
-
-    }
-
-    else if (type === "caat") {
-
-      motif =
-        KNOWN_MOTIFS.CAAT_BOX;
-
-    }
-
-
-    // --------------------------------------------------------
-    // Random 101 bp sequence
-    // --------------------------------------------------------
-
-    if (type === "random") {
-
-      const randomSequence =
-        randomSeq(
-          SEQUENCE_LENGTH
-        );
-
-
-      setSequence(
-        randomSequence
-      );
-
-    }
-
-
-    // --------------------------------------------------------
-    // 101 bp sequence containing motif
-    // --------------------------------------------------------
-
-    else {
-
-      const remainingLength =
-        SEQUENCE_LENGTH -
-        motif.length;
-
-
-      const prefixLength =
-        Math.floor(
-          remainingLength / 2
-        );
-
-
-      const suffixLength =
-        remainingLength -
-        prefixLength;
-
-
-      const prefix =
-        randomSeq(
-          prefixLength
-        );
-
-
-      const suffix =
-        randomSeq(
-          suffixLength
-        );
-
-
-      const exampleSequence =
-        prefix +
-        motif +
-        suffix;
-
-
-      setSequence(
-        exampleSequence
-      );
-
-    }
-
-
-    setError("");
-
-    setResult(null);
+  const getRandomBases = (len) => {
+    const bases = ['A', 'C', 'G', 'T'];
+    let res = '';
+    for (let i = 0; i < len; i++) res += bases[Math.floor(Math.random() * bases.length)];
+    return res;
   };
 
+  const loadPreset = (type) => {
+    // 1. Immediately wipe old results so old saliency scores don't misalign with the new sequence
+    setResult(null);
+    setError(null);
 
-  // ==========================================================
-  // RUN CNN PREDICTION
-  // ==========================================================
+    if (type === 'positive') {
+      const selected = MOTIF_POOL[Math.floor(Math.random() * MOTIF_POOL.length)];
+      let seqArr = getRandomBases(101).split('');
+      const insertPos = 35;
+      for (let i = 0; i < selected.seq.length; i++) {
+        seqArr[insertPos + i] = selected.seq[i];
+      }
+      setSequence(seqArr.join(''));
+    } else {
+      setSequence(getRandomBases(101));
+    }
+  };
 
-  const runPrediction = useCallback(
-    async () => {
+  const handlePredict = async () => {
+    setError(null);
+    if (sequence.length !== 101) {
+      setError(`Sequence length must be exactly 101 bp. Current length: ${sequence.length} bp.`);
+      return;
+    }
 
-      // ------------------------------------------------------
-      // Clean input
-      // ------------------------------------------------------
+    setLoading(true);
+    try {
+      const res = await fetch('http://127.0.0.1:8000/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sequence })
+      });
 
-      const seq =
-        sequence
-          .trim()
-          .toUpperCase();
-
-
-      setError("");
-
-
-      // ------------------------------------------------------
-      // Empty validation
-      // ------------------------------------------------------
-
-      if (!seq) {
-
-        setError(
-          "Enter a DNA sequence first."
-        );
-
-        return;
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Inference failed');
       }
 
-
-      // ------------------------------------------------------
-      // DNA validation
-      // ------------------------------------------------------
-
-      if (
-        !/^[ATCG]+$/.test(seq)
-      ) {
-
-        setError(
-          "Invalid sequence. Only A, T, C and G are allowed."
-        );
-
-        return;
-      }
-
-
-      // ------------------------------------------------------
-      // Length validation
-      // ------------------------------------------------------
-
-      if (
-        seq.length !==
-        SEQUENCE_LENGTH
-      ) {
-
-        setError(
-          `Sequence must be exactly ${SEQUENCE_LENGTH} bp. Current length: ${seq.length} bp.`
-        );
-
-        return;
-      }
-
-
-      // ------------------------------------------------------
-      // Start loading
-      // ------------------------------------------------------
-
-      setLoading(true);
-
-      setResult(null);
-
-
-      // Remove trailing slash
-      // from API URL
-
-      const base =
-        apiUrl
-          .trim()
-          .replace(
-            /\/$/,
-            ""
-          );
-
-
-      try {
-
-        // ----------------------------------------------------
-        // Send sequence to FastAPI
-        // ----------------------------------------------------
-
-        const response =
-          await fetch(
-            `${base}/predict`,
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
-
-              body: JSON.stringify({
-                sequence: seq
-              })
-            }
-          );
-
-
-        // ----------------------------------------------------
-        // Handle API error
-        // ----------------------------------------------------
-
-        if (!response.ok) {
-
-          const errorData =
-            await response
-              .json()
-              .catch(
-                () => ({})
-              );
-
-
-          throw new Error(
-            errorData.detail ||
-            `Request failed with status ${response.status}`
-          );
-        }
-
-
-        // ----------------------------------------------------
-        // Read API response
-        // ----------------------------------------------------
-
-        const data =
-          await response.json();
-
-
-        // ----------------------------------------------------
-        // Store result
-        // ----------------------------------------------------
-
-        setResult({
-          ...data,
-          sequence: seq
-        });
-
-      }
-
-
-      catch (err) {
-
-        setError(
-          `Error: ${err.message}. Make sure the CNN API is running at ${base}`
-        );
-
-      }
-
-
-      finally {
-
-        setLoading(false);
-
-      }
-
-    },
-    [
-      sequence,
-      apiUrl
-    ]
-  );
-
-
-  // ==========================================================
-  // UI
-  // ==========================================================
+      const data = await res.json();
+      setResult(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-
-    <div className="tfbs-app">
-
-      {/* ================================================== */}
-      {/* STYLES */}
-      {/* ================================================== */}
-
-      <style>{`
-
-        * {
-          box-sizing: border-box;
-        }
-
-
-        .tfbs-app {
-
-          --bg: #0B0E14;
-
-          --panel: #131922;
-
-          --panel-2: #0F1420;
-
-          --border: #232B38;
-
-          --text: #E8ECF1;
-
-          --muted: #7C8798;
-
-          --faint: #4A5364;
-
-          --accent: #7DE0E6;
-
-          --accent-dim:
-            rgba(
-              125,
-              224,
-              230,
-              0.12
-            );
-
-          background:
-            var(--bg);
-
-          color:
-            var(--text);
-
-          min-height:
-            100vh;
-
-          font-family:
-            'IBM Plex Sans',
-            system-ui,
-            sans-serif;
-
-          padding:
-            40px 24px 80px;
-        }
-
-
-        .tfbs-wrap {
-
-          max-width:
-            1080px;
-
-          margin:
-            0 auto;
-        }
-
-
-        /* ==================================================
-           HEADER
-        ================================================== */
-
-        .tfbs-header {
-
-          display:
-            flex;
-
-          justify-content:
-            space-between;
-
-          align-items:
-            flex-end;
-
-          gap:
-            24px;
-
-          margin-bottom:
-            32px;
-
-          border-bottom:
-            1px solid var(--border);
-
-          padding-bottom:
-            20px;
-        }
-
-
-        .tfbs-header h1 {
-
-          font-family:
-            'Space Grotesk',
-            sans-serif;
-
-          font-weight:
-            700;
-
-          font-size:
-            28px;
-
-          margin:
-            0 0 6px;
-
-          letter-spacing:
-            -0.01em;
-
-          background:
-            linear-gradient(
-              90deg,
-              #E8ECF1,
-              #7DE0E6
-            );
-
-          -webkit-background-clip:
-            text;
-
-          background-clip:
-            text;
-
-          -webkit-text-fill-color:
-            transparent;
-        }
-
-
-        .tfbs-header .sub {
-
-          color:
-            var(--muted);
-
-          font-size:
-            13px;
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-        }
-
-
-        /* ==================================================
-           LEGEND
-        ================================================== */
-
-        .legend {
-
-          display:
-            flex;
-
-          gap:
-            14px;
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            11px;
-
-          color:
-            var(--muted);
-        }
-
-
-        .legend span {
-
-          display:
-            inline-flex;
-
-          align-items:
-            center;
-
-          gap:
-            5px;
-        }
-
-
-        .dot {
-
-          width:
-            8px;
-
-          height:
-            8px;
-
-          border-radius:
-            2px;
-
-          display:
-            inline-block;
-        }
-
-
-        /* ==================================================
-           GRID
-        ================================================== */
-
-        .tfbs-grid {
-
-          display:
-            grid;
-
-          grid-template-columns:
-            1fr 1fr;
-
-          gap:
-            20px;
-        }
-
-
-        @media (max-width: 820px) {
-
-          .tfbs-grid {
-
-            grid-template-columns:
-              1fr;
-          }
-        }
-
-
-        /* ==================================================
-           PANELS
-        ================================================== */
-
-        .tfbs-panel {
-
-          background:
-            var(--panel);
-
-          border:
-            1px solid var(--border);
-
-          border-radius:
-            8px;
-
-          padding:
-            20px;
-
-          position:
-            relative;
-
-          overflow:
-            hidden;
-        }
-
-
-        .tfbs-panel::before {
-
-          content:
-            "";
-
-          position:
-            absolute;
-
-          top:
-            0;
-
-          left:
-            0;
-
-          right:
-            0;
-
-          height:
-            2px;
-
-          background:
-            linear-gradient(
-              90deg,
-              #4FD67A,
-              #FFC857,
-              #FF6B6B,
-              #5B9DFF
-            );
-
-          opacity:
-            0.6;
-        }
-
-
-        .tfbs-panel h2 {
-
-          font-family:
-            'Space Grotesk',
-            sans-serif;
-
-          font-size:
-            13px;
-
-          font-weight:
-            500;
-
-          text-transform:
-            uppercase;
-
-          letter-spacing:
-            0.08em;
-
-          color:
-            var(--muted);
-
-          margin:
-            0 0 14px;
-        }
-
-
-        /* ==================================================
-           TEXTAREA
-        ================================================== */
-
-        textarea {
-
-          width:
-            100%;
-
-          min-height:
-            110px;
-
-          background:
-            var(--panel-2);
-
-          border:
-            1px solid var(--border);
-
-          border-radius:
-            4px;
-
-          color:
-            var(--text);
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            14px;
-
-          padding:
-            12px;
-
-          resize:
-            vertical;
-
-          letter-spacing:
-            0.02em;
-
-          line-height:
-            1.6;
-
-          transition:
-            border-color 0.15s;
-        }
-
-
-        textarea:focus {
-
-          outline:
-            none;
-
-          border-color:
-            var(--accent);
-
-          box-shadow:
-            0 0 0 3px
-            var(--accent-dim);
-        }
-
-
-        /* ==================================================
-           PREVIEW
-        ================================================== */
-
-        .preview {
-
-          margin-top:
-            10px;
-
-          min-height:
-            44px;
-
-          background:
-            var(--panel-2);
-
-          border:
-            1px solid var(--border);
-
-          border-radius:
-            4px;
-
-          padding:
-            10px 12px;
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            14px;
-
-          letter-spacing:
-            0.03em;
-
-          word-break:
-            break-all;
-
-          line-height:
-            1.7;
-        }
-
-
-        .placeholder {
-
-          color:
-            var(--faint);
-        }
-
-
-        /* ==================================================
-           EXAMPLE BUTTONS
-        ================================================== */
-
-        .examples {
-
-          display:
-            flex;
-
-          flex-wrap:
-            wrap;
-
-          gap:
-            8px;
-
-          margin-top:
-            12px;
-        }
-
-
-        .ex-btn {
-
-          background:
-            transparent;
-
-          border:
-            1px solid var(--border);
-
-          color:
-            var(--muted);
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            11px;
-
-          padding:
-            7px 10px;
-
-          border-radius:
-            4px;
-
-          cursor:
-            pointer;
-
-          transition:
-            border-color 0.15s,
-            color 0.15s,
-            transform 0.1s;
-        }
-
-
-        .ex-btn:hover {
-
-          border-color:
-            var(--accent);
-
-          color:
-            var(--accent);
-        }
-
-
-        .ex-btn:active {
-
-          transform:
-            scale(0.96);
-        }
-
-
-        /* ==================================================
-           ACTION ROW
-        ================================================== */
-
-        .tfbs-row {
-
-          display:
-            flex;
-
-          gap:
-            10px;
-
-          align-items:
-            center;
-
-          margin-top:
-            16px;
-
-          flex-wrap:
-            wrap;
-        }
-
-
-        /* ==================================================
-           RUN BUTTON
-        ================================================== */
-
-        .run-btn {
-
-          background:
-            linear-gradient(
-              135deg,
-              #7DE0E6,
-              #5B9DFF
-            );
-
-          color:
-            #06181A;
-
-          border:
-            none;
-
-          font-family:
-            'Space Grotesk',
-            sans-serif;
-
-          font-weight:
-            700;
-
-          font-size:
-            14px;
-
-          padding:
-            10px 22px;
-
-          border-radius:
-            4px;
-
-          cursor:
-            pointer;
-
-          letter-spacing:
-            0.02em;
-
-          transition:
-            opacity 0.15s,
-            transform 0.1s;
-        }
-
-
-        .run-btn:hover:not(:disabled) {
-
-          opacity:
-            0.9;
-        }
-
-
-        .run-btn:active:not(:disabled) {
-
-          transform:
-            scale(0.97);
-        }
-
-
-        .run-btn:disabled {
-
-          opacity:
-            0.4;
-
-          cursor:
-            default;
-        }
-
-
-        /* ==================================================
-           API FIELD
-        ================================================== */
-
-        .api-field {
-
-          display:
-            flex;
-
-          align-items:
-            center;
-
-          gap:
-            6px;
-
-          margin-left:
-            auto;
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            11px;
-
-          color:
-            var(--faint);
-        }
-
-
-        .api-field input {
-
-          background:
-            var(--panel-2);
-
-          border:
-            1px solid var(--border);
-
-          color:
-            var(--muted);
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            11px;
-
-          padding:
-            5px 8px;
-
-          border-radius:
-            3px;
-
-          width:
-            180px;
-        }
-
-
-        /* ==================================================
-           ERROR MESSAGE
-        ================================================== */
-
-        .msg {
-
-          margin-top:
-            10px;
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            12px;
-
-          color:
-            #FF6B6B;
-
-          min-height:
-            16px;
-
-          line-height:
-            1.5;
-        }
-
-
-        /* ==================================================
-           LOADING BAR
-        ================================================== */
-
-        .scan-line {
-
-          position:
-            relative;
-
-          height:
-            2px;
-
-          background:
-            var(--panel-2);
-
-          margin-top:
-            12px;
-
-          border-radius:
-            2px;
-
-          overflow:
-            hidden;
-        }
-
-
-        .scan-line::after {
-
-          content:
-            "";
-
-          position:
-            absolute;
-
-          top:
-            0;
-
-          left:
-            0;
-
-          height:
-            100%;
-
-          width:
-            30%;
-
-          background:
-            var(--accent);
-
-          animation:
-            scan 1.1s
-            ease-in-out
-            infinite;
-        }
-
-
-        @keyframes scan {
-
-          0% {
-            left:
-              -30%;
-          }
-
-          100% {
-            left:
-              100%;
-          }
-        }
-
-
-        /* ==================================================
-           EMPTY STATE
-        ================================================== */
-
-        .empty-state {
-
-          color:
-            var(--faint);
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            12px;
-
-          padding:
-            30px 0;
-
-          text-align:
-            center;
-
-          line-height:
-            1.7;
-        }
-
-
-        /* ==================================================
-           RESULTS
-        ================================================== */
-
-        .results-body {
-
-          animation:
-            fadeIn 0.35s ease;
-        }
-
-
-        @keyframes fadeIn {
-
-          from {
-
-            opacity:
-              0;
-
-            transform:
-              translateY(4px);
-          }
-
-          to {
-
-            opacity:
-              1;
-
-            transform:
-              translateY(0);
-          }
-        }
-
-
-        .gauge-row {
-
-          display:
-            flex;
-
-          align-items:
-            center;
-
-          gap:
-            24px;
-
-          flex-wrap:
-            wrap;
-        }
-
-
-        /* ==================================================
-           GAUGE
-        ================================================== */
-
-        .gauge-arc {
-
-          transition:
-            stroke-dashoffset 0.8s ease,
-            stroke 0.3s ease;
-        }
-
-
-        .gauge-pct {
-
-          font-family:
-            'Space Grotesk',
-            sans-serif;
-
-          font-size:
-            20px;
-
-          font-weight:
-            700;
-        }
-
-
-        .gauge-label {
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            9px;
-
-          fill:
-            #7C8798;
-
-          text-transform:
-            uppercase;
-
-          letter-spacing:
-            0.05em;
-        }
-
-
-        /* ==================================================
-           RESULT METADATA
-        ================================================== */
-
-        .meta-line {
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            12px;
-
-          color:
-            var(--muted);
-
-          margin-bottom:
-            5px;
-        }
-
-
-        .prediction-label {
-
-          margin-top:
-            10px;
-
-          font-family:
-            'Space Grotesk',
-            sans-serif;
-
-          font-size:
-            15px;
-
-          font-weight:
-            600;
-
-          line-height:
-            1.4;
-        }
-
-
-        .model-badge {
-
-          display:
-            inline-block;
-
-          margin-top:
-            8px;
-
-          padding:
-            4px 8px;
-
-          border:
-            1px solid
-            rgba(
-              125,
-              224,
-              230,
-              0.3
-            );
-
-          border-radius:
-            3px;
-
-          color:
-            var(--accent);
-
-          background:
-            var(--accent-dim);
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            10px;
-        }
-
-
-        /* ==================================================
-           MOTIFS
-        ================================================== */
-
-        .motif-list {
-
-          display:
-            flex;
-
-          flex-wrap:
-            wrap;
-
-          gap:
-            8px;
-
-          margin-top:
-            14px;
-        }
-
-
-        .motif-chip {
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            11px;
-
-          padding:
-            5px 10px;
-
-          border-radius:
-            3px;
-
-          background:
-            var(--accent-dim);
-
-          color:
-            var(--accent);
-
-          border:
-            1px solid
-            rgba(
-              125,
-              224,
-              230,
-              0.3
-            );
-
-          animation:
-            popIn 0.3s
-            ease backwards;
-        }
-
-
-        @keyframes popIn {
-
-          from {
-
-            opacity:
-              0;
-
-            transform:
-              scale(0.85);
-          }
-
-          to {
-
-            opacity:
-              1;
-
-            transform:
-              scale(1);
-          }
-        }
-
-
-        .no-motifs {
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            12px;
-
-          color:
-            var(--faint);
-
-          margin-top:
-            14px;
-        }
-
-
-        /* ==================================================
-           SALIENCY
-        ================================================== */
-
-        .track-wrap {
-
-          margin-top:
-            20px;
-        }
-
-
-        .track-label {
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            11px;
-
-          color:
-            var(--muted);
-
-          margin-bottom:
-            8px;
-
-          text-transform:
-            uppercase;
-
-          letter-spacing:
-            0.06em;
-        }
-
-
-        .track {
-
-          display:
-            flex;
-
-          align-items:
-            flex-end;
-
-          height:
-            80px;
-
-          gap:
-            1px;
-
-          background:
-            var(--panel-2);
-
-          border:
-            1px solid var(--border);
-
-          border-radius:
-            4px;
-
-          padding:
-            6px 4px 0;
-
-          overflow-x:
-            auto;
-        }
-
-
-        .track-bar {
-
-          flex:
-            0 0 auto;
-
-          width:
-            5px;
-
-          min-height:
-            2px;
-
-          border-radius:
-            1px 1px 0 0;
-
-          animation:
-            growUp 0.3s
-            ease backwards;
-        }
-
-
-        @keyframes growUp {
-
-          from {
-
-            transform:
-              scaleY(0);
-          }
-
-          to {
-
-            transform:
-              scaleY(1);
-          }
-        }
-
-
-        .ruler {
-
-          display:
-            flex;
-
-          justify-content:
-            space-between;
-
-          font-family:
-            'IBM Plex Mono',
-            monospace;
-
-          font-size:
-            10px;
-
-          color:
-            var(--faint);
-
-          margin-top:
-            4px;
-
-          padding:
-            0 4px;
-        }
-
-
-        /* ==================================================
-           RESPONSIVE
-        ================================================== */
-
-        @media (max-width: 600px) {
-
-          .tfbs-app {
-
-            padding:
-              24px 12px 50px;
-          }
-
-
-          .tfbs-header {
-
-            align-items:
-              flex-start;
-
-            flex-direction:
-              column;
-          }
-
-
-          .legend {
-
-            align-self:
-              flex-start;
-          }
-
-
-          .api-field {
-
-            margin-left:
-              0;
-
-            width:
-              100%;
-          }
-
-
-          .api-field input {
-
-            flex:
-              1;
-
-            width:
-              auto;
-          }
-
-
-          .run-btn {
-
-            width:
-              100%;
-          }
-
-        }
-
-      `}</style>
-
-
-      {/* ==================================================== */}
-      {/* MAIN CONTAINER */}
-      {/* ==================================================== */}
-
-      <div className="tfbs-wrap">
-
-
-        {/* ================================================== */}
-        {/* HEADER */}
-        {/* ================================================== */}
-
-        <div className="tfbs-header">
-
-          <div>
-
-            <h1>
-              TFBS prediction console
-            </h1>
-
-
-            <div className="sub">
-
-              CNN-based transcription factor
-              binding site prediction
-
-            </div>
-
+    <div style={{ minHeight: '100vh', padding: '40px 24px', maxWidth: '1200px', margin: '0 auto', color: '#e2e8f0', fontFamily: 'sans-serif' }}>
+      
+      {/* Header */}
+      <header style={{ borderBottom: '1px solid #1e293b', paddingBottom: '20px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '2px', color: '#38bdf8', fontFamily: 'monospace' }}>
+            Multi-Architecture Regulatory Genomics Framework (ICAIBE)
+          </span>
+          <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#f8fafc', marginTop: '6px' }}>
+            TFBS Prediction & Interpretability Workbench
+          </h1>
+        </div>
+        <div style={{ textAlign: 'right', fontSize: '12px', color: '#94a3b8', fontFamily: 'monospace' }}>
+          Pipeline: <strong style={{ color: '#38bdf8' }}>CNN + BiLSTM + Transformer</strong>
+        </div>
+      </header>
+
+      {/* Input Sequence Section */}
+      <section style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '14px', padding: '24px', marginBottom: '32px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+          <label style={{ fontSize: '12px', fontFamily: 'monospace', textTransform: 'uppercase', color: '#94a3b8' }}>
+            Genomic Sequence Input (101 bp)
+          </label>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button onClick={() => loadPreset('positive')} style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '12px', cursor: 'pointer', fontFamily: 'monospace' }}>
+              + Generate Random Motif Sequence
+            </button>
+            <button onClick={() => loadPreset('negative')} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '12px', cursor: 'pointer', fontFamily: 'monospace' }}>
+              + Control Sequence
+            </button>
           </div>
-
-
-          {/* DNA legend */}
-
-          <div className="legend">
-
-            <span>
-
-              <span
-                className="dot"
-                style={{
-                  background:
-                    BASE_COLORS.A
-                }}
-              />
-
-              A
-
-            </span>
-
-
-            <span>
-
-              <span
-                className="dot"
-                style={{
-                  background:
-                    BASE_COLORS.T
-                }}
-              />
-
-              T
-
-            </span>
-
-
-            <span>
-
-              <span
-                className="dot"
-                style={{
-                  background:
-                    BASE_COLORS.C
-                }}
-              />
-
-              C
-
-            </span>
-
-
-            <span>
-
-              <span
-                className="dot"
-                style={{
-                  background:
-                    BASE_COLORS.G
-                }}
-              />
-
-              G
-
-            </span>
-
-          </div>
-
         </div>
 
+        <textarea
+          value={sequence}
+          onChange={(e) => {setSequence(e.target.value.toUpperCase().replace(/[^ATCG]/g, ''));
+          if (result) setResult(null);
+          }} // Clear stale saliency map when sequence is modified
+          rows={3}
+          placeholder="Paste raw 101 bp DNA sequence..."
+          style={{
+            width: '100%',
+            backgroundColor: '#090d16',
+            border: '1px solid #1e293b',
+            borderRadius: '8px',
+            padding: '14px',
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: '#f8fafc',
+            letterSpacing: '1.5px',
+            resize: 'none',
+            outline: 'none'
+          }}
+        />
 
-        {/* ================================================== */}
-        {/* MAIN GRID */}
-        {/* ================================================== */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+          <span style={{ fontSize: '12px', fontFamily: 'monospace', color: sequence.length === 101 ? '#34d399' : '#f59e0b' }}>
+            Sequence Length: {sequence.length} / 101 bp
+          </span>
 
-        <div className="tfbs-grid">
+          <button
+            onClick={handlePredict}
+            disabled={loading || sequence.length !== 101}
+            style={{
+              backgroundColor: sequence.length === 101 ? '#0284c7' : '#334155',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '10px 24px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: sequence.length === 101 && !loading ? 'pointer' : 'not-allowed'
+            }}
+          >
+            {loading ? 'Executing Tri-Branch Pipeline...' : 'Run Binding Inference'}
+          </button>
+        </div>
 
+        {error && (
+          <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', borderRadius: '8px', fontSize: '13px' }}>
+            {error}
+          </div>
+        )}
+      </section>
 
-          {/* ================================================= */}
-          {/* LEFT: SEQUENCE INPUT */}
-          {/* ================================================= */}
-
-          <div className="tfbs-panel">
-
-            <h2>
-              Sequence input
-            </h2>
-
-
-            {/* DNA input */}
-
-            <textarea
-
-              placeholder={
-                "Enter a 101 bp DNA sequence — A, T, C, G only"
-              }
-
-              spellCheck={false}
-
-              value={sequence}
-
-              onChange={(event) => {
-
-                setSequence(
-                  event.target.value
-                );
-
-                setError("");
-
-                setResult(null);
-
-              }}
-
-            />
-
-
-            {/* ================================================= */}
-            {/* SEQUENCE PREVIEW */}
-            {/* ================================================= */}
-
-            <div className="preview">
-
-              <SequencePreview
-                sequence={
-                  sequence
-                    .trim()
-                    .toUpperCase()
-                }
-              />
-
+      {/* Results View */}
+      {result && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          
+          {/* Top Score Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+            <div style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '14px', padding: '20px' }}>
+              <span style={{ fontSize: '11px', textTransform: 'uppercase', fontFamily: 'monospace', color: '#94a3b8' }}>
+                Binding Probability (Tri-Branch Fused)
+              </span>
+              <div style={{ fontSize: '36px', fontWeight: '800', color: '#38bdf8', fontFamily: 'monospace', marginTop: '8px' }}>
+                {(result.binding_probability * 100).toFixed(2)}%
+              </div>
+              <div style={{ width: '100%', height: '6px', backgroundColor: '#090d16', borderRadius: '3px', marginTop: '12px', overflow: 'hidden' }}>
+                <div style={{ width: `${result.binding_probability * 100}%`, height: '100%', backgroundColor: '#38bdf8', transition: 'width 0.6s ease' }} />
+              </div>
             </div>
 
-
-            {/* ================================================= */}
-            {/* EXAMPLE BUTTONS */}
-            {/* ================================================= */}
-
-            <div className="examples">
-
-
-              {/* TATA */}
-
-              <button
-                className="ex-btn"
-                onClick={() =>
-                  insertExample("tata")
-                }
-              >
-
-                insert TATA box example
-
-              </button>
-
-
-              {/* GC */}
-
-              <button
-                className="ex-btn"
-                onClick={() =>
-                  insertExample("gc")
-                }
-              >
-
-                insert GC box example
-
-              </button>
-
-
-              {/* CAAT */}
-
-              <button
-                className="ex-btn"
-                onClick={() =>
-                  insertExample("caat")
-                }
-              >
-
-                insert CAAT box example
-
-              </button>
-
-
-              {/* Random */}
-
-              <button
-                className="ex-btn"
-                onClick={() =>
-                  insertExample("random")
-                }
-              >
-
-                random 101 bp sequence
-
-              </button>
-
+            <div style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '14px', padding: '20px' }}>
+              <span style={{ fontSize: '11px', textTransform: 'uppercase', fontFamily: 'monospace', color: '#94a3b8' }}>
+                Functional Verdict
+              </span>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#ffffff', marginTop: '10px' }}>
+                {result.prediction_label}
+              </div>
+              <span style={{
+                display: 'inline-block',
+                marginTop: '12px',
+                fontSize: '11px',
+                fontFamily: 'monospace',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                backgroundColor: result.prediction === 1 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.2)',
+                color: result.prediction === 1 ? '#34d399' : '#94a3b8',
+                border: `1px solid ${result.prediction === 1 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`
+              }}>
+                Threshold: 0.50
+              </span>
             </div>
 
+            <div style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '14px', padding: '20px' }}>
+              <span style={{ fontSize: '11px', textTransform: 'uppercase', fontFamily: 'monospace', color: '#94a3b8' }}>
+                Recovered Motif / JASPAR Profile
+              </span>
+              <div style={{ marginTop: '10px', fontSize: '15px', color: '#38bdf8', fontFamily: 'monospace', fontWeight: '600' }}>
+                {result.visualizations?.sequence_logo?.matched_jaspar_id}
+              </div>
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px', fontFamily: 'monospace' }}>
+                Core: <span style={{ color: '#f8fafc' }}>{result.visualizations?.sequence_logo?.core_sequence}</span> (Pos {result.visualizations?.sequence_logo?.window_start})
+              </div>
+            </div>
+          </div>
 
-            {/* ================================================= */}
-            {/* PREDICTION ROW */}
-            {/* ================================================= */}
-
-            <div className="tfbs-row">
-
-
-              {/* Run prediction */}
-
-              <button
-
-                className="run-btn"
-
-                onClick={
-                  runPrediction
-                }
-
-                disabled={
-                  loading
-                }
-
-              >
-
-                {
-                  loading
-                    ? "running CNN..."
-                    : "run CNN prediction"
-                }
-
-              </button>
-
-
-              {/* API URL */}
-
-              <div className="api-field">
-
-                <span>
-                  API
+          {/* Module 1: ShiftSmooth Saliency Track */}
+          {result.visualizations?.saliency_map && (
+            <div style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '14px', padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#f8fafc', fontFamily: 'monospace' }}>
+                  1. ShiftSmooth Gradient Attribution Track (Averaged Over Cyclic Shifts)
+                </h3>
+                <span style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace' }}>
+                  Nucleotide Resolution Importance
                 </span>
-
-
-                <input
-
-                  value={
-                    apiUrl
-                  }
-
-                  spellCheck={false}
-
-                  onChange={(event) =>
-                    setApiUrl(
-                      event.target.value
-                    )
-                  }
-
-                />
-
               </div>
 
-            </div>
-
-
-            {/* ================================================= */}
-            {/* ERROR */}
-            {/* ================================================= */}
-
-            <div className="msg">
-
-              {error}
-
-            </div>
-
-
-            {/* ================================================= */}
-            {/* LOADING ANIMATION */}
-            {/* ================================================= */}
-
-            {
-              loading && (
-
-                <div className="scan-line" />
-
-              )
-            }
-
-          </div>
-
-
-          {/* ================================================= */}
-          {/* RIGHT: RESULTS */}
-          {/* ================================================= */}
-
-          <div className="tfbs-panel">
-
-            <h2>
-              CNN prediction results
-            </h2>
-
-
-            {/* ================================================= */}
-            {/* EMPTY STATE */}
-            {/* ================================================= */}
-
-            {
-              !result &&
-              !loading && (
-
-                <div className="empty-state">
-
-                  Run a 101 bp sequence to see
-                  binding probability and
-                  CNN saliency.
-
+              <div style={{ overflowX: 'auto', paddingBottom: '12px', paddingTop: '32px' }}>
+                <div style={{ display: 'inline-flex', gap: '3px', alignItems: 'flex-end', minWidth: '100%' }}>
+                  {sequence.split('').map((char, i) => {
+                    const score = result.visualizations.saliency_map[i] || 0;
+                    const theme = NUCLEOTIDE_THEMES[char] || NUCLEOTIDE_THEMES.A;
+                    return (
+                      <div key={i} title={`Pos ${i} (${char}): ${score}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                        <div
+                          style={{
+                            width: '12px',
+                            backgroundColor: theme.bar,
+                            height: `${Math.max(score * 70, 3)}px`,
+                            borderTopLeftRadius: '2px',
+                            borderTopRightRadius: '2px',
+                            opacity: 0.85
+                          }}
+                        />
+                        <div
+                          style={{
+                            width: '16px',
+                            height: '20px',
+                            marginTop: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            fontFamily: 'monospace',
+                            borderRadius: '3px',
+                            backgroundColor: theme.bg,
+                            border: `1px solid ${theme.border}`,
+                            color: theme.text
+                          }}
+                        >
+                          {char}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+              </div>
+            </div>
+          )}
 
-              )
-            }
+          {/* Module 2: In Silico Mutagenesis Profile */}
+          {result.visualizations?.in_silico_mutagenesis?.length > 0 && (
+            <div style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '14px', padding: '24px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#f8fafc', fontFamily: 'monospace', marginBottom: '14px' }}>
+                2. In Silico Mutagenesis (ISM) – Single-Nucleotide Variant Impacts
+              </h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #1e293b', color: '#94a3b8', fontFamily: 'monospace' }}>
+                    <th style={{ padding: '8px' }}>Position</th>
+                    <th style={{ padding: '8px' }}>Mutation</th>
+                    <th style={{ padding: '8px' }}>Binding Score Shift (ΔP)</th>
+                    <th style={{ padding: '8px' }}>Mechanistic Interpretation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.visualizations.in_silico_mutagenesis.map((row, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #1e293b' }}>
+                      <td style={{ padding: '10px 8px', fontFamily: 'monospace' }}>Pos {row.position}</td>
+                      <td style={{ padding: '10px 8px', fontFamily: 'monospace', color: '#38bdf8' }}>{row.mutation}</td>
+                      <td style={{ padding: '10px 8px', fontFamily: 'monospace', color: row.delta_p < 0 ? '#f87171' : '#34d399' }}>
+                        {row.delta_p > 0 ? `+${row.delta_p}` : row.delta_p}
+                      </td>
+                      <td style={{ padding: '10px 8px' }}>
+                        {row.delta_p < -0.1 ? 'Binding disruption (Core motif damage)' : 'Contextual flanking attenuation'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-
-            {/* ================================================= */}
-            {/* RESULTS */}
-            {/* ================================================= */}
-
-            {
-              result && (
-
-                <div className="results-body">
-
-
-                  {/* ========================================= */}
-                  {/* PROBABILITY */}
-                  {/* ========================================= */}
-
-                  <div className="gauge-row">
-
-
-                    <Gauge
-                      probability={
-                        result.binding_probability
-                      }
-                    />
-
-
-                    <div>
-
-
-                      {/* Sequence length */}
-
-                      <div className="meta-line">
-
-                        Input length:
-                        {" "}
-                        {result.input_length}
-                        {" "}
-                        bp
-
+          {/* Module 3: Sequence Logo Matrix */}
+          {result.visualizations?.sequence_logo && (
+            <div style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '14px', padding: '24px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#f8fafc', fontFamily: 'monospace', marginBottom: '14px' }}>
+                3. Learned Motif Sequence Frequency Weights (PFM Representation)
+              </h3>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                {result.visualizations.sequence_logo.frequency_matrix.map((col, idx) => (
+                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: '#090d16', padding: '10px', borderRadius: '8px', border: '1px solid #1e293b' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace' }}>Pos {result.visualizations.sequence_logo.window_start + idx}</span>
+                    {Object.entries(col).map(([b, freq]) => (
+                      <div key={b} style={{ fontSize: '12px', fontFamily: 'monospace', color: NUCLEOTIDE_THEMES[b].text }}>
+                        {b}: {(freq * 100).toFixed(0)}%
                       </div>
-
-
-                      {/* Prediction */}
-
-                      <div className="prediction-label">
-
-                        {
-                          result.prediction_label
-                        }
-
-                      </div>
-
-
-                      {/* Model */}
-
-                      <div className="model-badge">
-
-                        Model:
-                        {" "}
-                        {result.model}
-
-                      </div>
-
-                    </div>
-
+                    ))}
                   </div>
-
-
-                  {/* ========================================= */}
-                  {/* MOTIF RESULTS */}
-                  {/* ========================================= */}
-
-                  {
-                    result.motifs_detected &&
-                    result.motifs_detected.length > 0
-                      ? (
-
-                        <div className="motif-list">
-
-                          {
-                            result.motifs_detected.map(
-                              (
-                                motif,
-                                index
-                              ) => (
-
-                                <span
-                                  key={motif}
-                                  className="motif-chip"
-                                  style={{
-                                    animationDelay:
-                                      `${index * 80}ms`
-                                  }}
-                                >
-
-                                  {motif}
-
-                                </span>
-
-                              )
-                            )
-                          }
-
-                        </div>
-
-                      )
-                      : (
-
-                        <div className="no-motifs">
-
-                          No known motifs detected.
-
-                        </div>
-
-                      )
-                  }
-
-
-                  {/* ========================================= */}
-                  {/* SALIENCY MAP */}
-                  {/* ========================================= */}
-
-                  <SaliencyTrack
-
-                    saliency={
-                      result
-                        .visualizations
-                        ?.saliency_map || []
-                    }
-
-                    sequence={
-                      result.sequence
-                    }
-
-                  />
-
-
-                </div>
-
-              )
-            }
-
-          </div>
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
-
-      </div>
+      )}
 
     </div>
   );

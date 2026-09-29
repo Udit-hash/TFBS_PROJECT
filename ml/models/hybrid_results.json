@@ -1,0 +1,10 @@
+{
+    "model": "Hybrid_CNN_BiLSTM",
+    "sequence_length": 101,
+    "test_loss": 0.5791256154908074,
+    "AUROC": 0.8836469135802468,
+    "accuracy": 0.685,
+    "precision": 0.913151364764268,
+    "recall": 0.4088888888888889,
+    "F1": 0.5648503453568687
+}

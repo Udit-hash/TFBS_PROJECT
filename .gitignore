@@ -1,117 +1,34 @@
-# ============================================================
-# PYTHON
-# ============================================================
+# Python environments & virtual environments
+.venv/
+venv/
+env/
+*/venv/
+*/.venv/
 
+# Python bytecode & cache
 __pycache__/
 *.py[cod]
-*.pyo
+*$py.class
+*.ipynb_checkpoints/
 
-# Python virtual environments
-venv/
-.venv/
-env/
-ENV/
-
-# Project-specific virtual environments
-backend/venv/
-ml/venv/
-
-
-# ============================================================
-# PYTHON ENVIRONMENT / SECRETS
-# ============================================================
-
-.env
-.env.*
-!.env.example
-
-
-# ============================================================
-# NODE / REACT
-# ============================================================
-
+# Node / Vite dependencies and builds
 node_modules/
 frontend/node_modules/
-
 dist/
-frontend/dist/
-
 build/
-frontend/build/
+.eslintcache
 
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Large dataset files (keep raw code, omit bulk generated data)
+ml/data/raw/*.csv
+ml/data/processed/*.csv
 
-
-# ============================================================
-# ML DATA
-# ============================================================
-
-# Raw and processed datasets
-# Do NOT push large training datasets to GitHub
-
-ml/data/raw/
-ml/data/processed/
-
-
-# ============================================================
-# ML GENERATED FILES
-# ============================================================
-
-# Training logs / generated results
-ml/models/cnn_results.json
-
-# Training plots
-ml/models/training_curve.png
-
-# TensorBoard
-runs/
-ml/runs/
-
-
-# ============================================================
-# LARGE MODEL CHECKPOINTS
-# ============================================================
-
-# Uncomment these if best_cnn.pth is too large for GitHub
+# Optional: Large model checkpoints (>100MB should use Git LFS, but .pth under 50MB is fine)
 # ml/models/*.pth
 
-
-# ============================================================
-# JUPYTER
-# ============================================================
-
-.ipynb_checkpoints/
-
-
-# ============================================================
-# VS CODE
-# ============================================================
-
-.vscode/
-
-
-# ============================================================
-# OPERATING SYSTEM
-# ============================================================
-
+# OS and IDE files
 .DS_Store
 Thumbs.db
-desktop.ini
-
-
-# ============================================================
-# LOGS
-# ============================================================
-
-*.log
-
-
-# ============================================================
-# TEMPORARY FILES
-# ============================================================
-
-*.tmp
-*.temp
-*.bak
+.vscode/
+.idea/
+.env
+.env.*

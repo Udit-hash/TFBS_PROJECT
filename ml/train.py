@@ -32,7 +32,7 @@ from config import (
 
 from preprocessing import one_hot_encode
 
-from models.cnn import TFBS_CNN
+from models.hybrid import TFBS_TriBranch
 
 
 # ============================================================
@@ -528,11 +528,7 @@ def main():
     # MODEL
     # ========================================================
 
-    model = TFBS_CNN()
-
-    model = model.to(
-        DEVICE
-    )
+    model = TFBS_TriBranch(seq_len=SEQUENCE_LENGTH).to(DEVICE)
 
     print("\n========================================")
 
@@ -579,14 +575,14 @@ def main():
     )
 
     # ========================================================
-    # OPTIMIZER
+    # ========================================================
+    # OPTIMIZER (With L2 Weight Decay to Prevent Overfitting)
     # ========================================================
 
     optimizer = torch.optim.Adam(
-
         model.parameters(),
-
-        lr=LEARNING_RATE
+        lr=LEARNING_RATE,
+        weight_decay=1e-4  # Constrains attention & recurrent weights
     )
 
     # ========================================================
@@ -601,14 +597,11 @@ def main():
         "inf"
     )
 
-    patience = 4
+    patience = 5
 
     patience_counter = 0
 
-    best_model_path = (
-        MODEL_DIR
-        / "best_cnn.pth"
-    )
+    best_model_path = MODEL_DIR / "best_hybrid.pth"
 
     # ========================================================
     # TRAINING LOOP
@@ -737,55 +730,16 @@ def main():
         # --------------------------------------------
 
         if val_loss < best_val_loss:
-
             best_val_loss = val_loss
-
             patience_counter = 0
-
-            torch.save(
-
-                {
-
-                    "model_state_dict":
-                        model.state_dict(),
-
-                    "sequence_length":
-                        SEQUENCE_LENGTH,
-
-                    "model_name":
-                        "TFBS_CNN",
-
-                    "val_loss":
-                        val_loss
-
-                },
-
-                best_model_path
-            )
-
-            print(
-                "✓ Best model saved"
-            )
-
+            torch.save({"model_state_dict": model.state_dict()}, best_model_path)
+            print("✓ Best model saved")
         else:
-
             patience_counter += 1
-
-            print(
-                f"No improvement "
-                f"({patience_counter}/{patience})"
-            )
-
-        # --------------------------------------------
-        # Early stopping
-        # --------------------------------------------
+            print(f"No improvement ({patience_counter}/{patience})")
 
         if patience_counter >= patience:
-
-            print(
-                "\nEarly stopping triggered."
-            )
-
+            print("\nEarly stopping triggered.")
             break
 
     # ========================================================
@@ -878,63 +832,22 @@ def main():
     # ========================================================
 
     results = {
-
-        "model": "CNN",
-
-        "sequence_length":
-            SEQUENCE_LENGTH,
-
-        "test_loss":
-            test_loss,
-
-        "AUROC":
-            test_metrics["auroc"],
-
-        "accuracy":
-            test_metrics["accuracy"],
-
-        "precision":
-            test_metrics["precision"],
-
-        "recall":
-            test_metrics["recall"],
-
-        "F1":
-            test_metrics["f1"]
-
+        "model": "Hybrid_CNN_BiLSTM",
+        "sequence_length": SEQUENCE_LENGTH,
+        "test_loss": test_loss,
+        "AUROC": test_metrics["auroc"],
+        "accuracy": test_metrics["accuracy"],
+        "precision": test_metrics["precision"],
+        "recall": test_metrics["recall"],
+        "F1": test_metrics["f1"]
     }
 
-    results_path = (
-        MODEL_DIR
-        / "cnn_results.json"
-    )
+    results_path = MODEL_DIR / "hybrid_results.json"
+    with open(results_path, "w") as file:
+        json.dump(results, file, indent=4)
 
-    with open(
-        results_path,
-        "w"
-    ) as file:
-
-        json.dump(
-            results,
-            file,
-            indent=4
-        )
-
-    print(
-        "\nResults saved to:"
-    )
-
-    print(
-        results_path
-    )
-
-    print(
-        "\nBest model saved to:"
-    )
-
-    print(
-        best_model_path
-    )
+    print(f"\nResults saved to: {results_path}")
+    print(f"Best model saved to: {best_model_path}")
 
 
 if __name__ == "__main__":
