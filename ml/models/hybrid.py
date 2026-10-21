@@ -26,16 +26,25 @@ class TFBS_TriBranch(nn.Module):
     - Bidirectional LSTM
     - Multi-Head Self-Attention Transformer
     """
-    def __init__(self, seq_len=101, lstm_hidden=32, nhead=4, dropout=0.2):
+    def __init__(
+        self,
+        seq_len=101,
+        lstm_hidden=48,
+        nhead=4,
+        dropout=0.25,
+        conv_channels=24,
+        classifier_hidden=128,
+        classifier_intermediate=True,
+        classifier_output=64,
+    ):
         super(TFBS_TriBranch, self).__init__()
         
         # 1. Multi-Scale Convolutional Feature Extractors (8, 16, 24 bp)
-        self.conv8 = nn.Conv1d(in_channels=4, out_channels=16, kernel_size=8, padding=4)
-        self.conv16 = nn.Conv1d(in_channels=4, out_channels=16, kernel_size=16, padding=8)
-        self.conv24 = nn.Conv1d(in_channels=4, out_channels=16, kernel_size=24, padding=12)
+        self.conv8 = nn.Conv1d(in_channels=4, out_channels=conv_channels, kernel_size=8, padding=4)
+        self.conv16 = nn.Conv1d(in_channels=4, out_channels=conv_channels, kernel_size=16, padding=8)
+        self.conv24 = nn.Conv1d(in_channels=4, out_channels=conv_channels, kernel_size=24, padding=12)
         
-        # 16 + 16 + 16 = 48 feature channels
-        total_conv_channels = 48
+        total_conv_channels = conv_channels * 3
         self.bn_conv = nn.BatchNorm1d(total_conv_channels)
         self.pool = nn.MaxPool1d(kernel_size=2, stride=2)  # 101 -> 50 positions
         self.drop = nn.Dropout(dropout)
@@ -62,23 +71,31 @@ class TFBS_TriBranch(nn.Module):
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=1)
         
         # Concatenated dimensions:
-        # CNN MaxPool: 48
-        # BiLSTM MaxPool: lstm_hidden * 2 = 64
-        # Transformer MaxPool: 48
-        fused_dim = total_conv_channels + (lstm_hidden * 2) + total_conv_channels  # 160
-        
-        # 4. Dense Classification Head
-        self.classifier = nn.Sequential(
-            nn.Linear(fused_dim, 64),
-            nn.ReLU(),
-            nn.BatchNorm1d(64),
-            nn.Dropout(dropout),
-            nn.Linear(64, 1)
-        )
+        # CNN MaxPool: 72
+        # BiLSTM MaxPool: lstm_hidden * 2 = 96
+        # Transformer MaxPool: 72
+        fused_dim = total_conv_channels + (lstm_hidden * 2) + total_conv_channels
 
-    def forward(self, x):
+        # 4. Dense Classification Head
+        classifier_layers = [
+            nn.Linear(fused_dim, classifier_hidden),
+            nn.GELU(),
+            nn.BatchNorm1d(classifier_hidden),
+            nn.Dropout(dropout),
+        ]
+        if classifier_intermediate:
+            classifier_layers.extend([
+                nn.Linear(classifier_hidden, classifier_output),
+                nn.GELU(),
+                nn.Dropout(dropout),
+            ])
+            classifier_hidden = classifier_output
+        classifier_layers.append(nn.Linear(classifier_hidden, 1))
+        self.classifier = nn.Sequential(*classifier_layers)
+
+    def encode_sequence(self, x):
         # x: (batch, 4, seq_len)
-        
+
         # Branch 1: Multi-scale Convolutions
         c8 = F.relu(self.conv8(x))
         c16 = F.relu(self.conv16(x))
@@ -106,8 +123,8 @@ class TFBS_TriBranch(nn.Module):
         trans_out = self.transformer(trans_tokens)
         trans_rep, _ = torch.max(trans_out, dim=1)  # (batch, 48)
         
-        # Tri-Branch Concatenation
-        fused = torch.cat([cnn_rep, lstm_rep, trans_rep], dim=1)  # (batch, 160)
+        # Tri-Branch sequence representation: (batch, 240)
+        return torch.cat([cnn_rep, lstm_rep, trans_rep], dim=1)
         
-        logits = self.classifier(fused)  # Returns (batch, 1) to match BCE targets exactly
-        return logits
+    def forward(self, x):
+        return self.classifier(self.encode_sequence(x))

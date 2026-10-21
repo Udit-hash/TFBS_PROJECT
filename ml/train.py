@@ -576,13 +576,22 @@ def main():
 
     # ========================================================
     # ========================================================
-    # OPTIMIZER (With L2 Weight Decay to Prevent Overfitting)
+    # OPTIMIZER (Improved generalization for motif-rich DNA tasks)
     # ========================================================
 
-    optimizer = torch.optim.Adam(
+    optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=LEARNING_RATE,
-        weight_decay=1e-4  # Constrains attention & recurrent weights
+        weight_decay=5e-4
+    )
+
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="max",
+        factor=0.5,
+        patience=3,
+        threshold=1e-4,
+        min_lr=1e-6
     )
 
     # ========================================================
@@ -593,11 +602,9 @@ def main():
 
     val_losses = []
 
-    best_val_loss = float(
-        "inf"
-    )
+    best_val_f1 = -float("inf")
 
-    patience = 5
+    patience = 6
 
     patience_counter = 0
 
@@ -726,17 +733,19 @@ def main():
         )
 
         # --------------------------------------------
-        # Save best model
+        # Save best model using validation F1, which better reflects motif quality
         # --------------------------------------------
 
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
+        if val_metrics["f1"] > best_val_f1:
+            best_val_f1 = val_metrics["f1"]
             patience_counter = 0
             torch.save({"model_state_dict": model.state_dict()}, best_model_path)
             print("✓ Best model saved")
         else:
             patience_counter += 1
             print(f"No improvement ({patience_counter}/{patience})")
+
+        scheduler.step(val_metrics["f1"])
 
         if patience_counter >= patience:
             print("\nEarly stopping triggered.")

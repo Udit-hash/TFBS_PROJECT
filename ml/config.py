@@ -58,11 +58,11 @@ BASE_TO_INDEX = {
 # TRAINING
 # ============================================================
 
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 
-EPOCHS = 15
+EPOCHS = 30
 
-LEARNING_RATE = 0.001
+LEARNING_RATE = 3e-4
 
 RANDOM_SEED = 42
 

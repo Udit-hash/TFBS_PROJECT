@@ -21,6 +21,8 @@ build/
 # Large dataset files (keep raw code, omit bulk generated data)
 ml/data/raw/*.csv
 ml/data/processed/*.csv
+ml/data/processed/dna_shape/
+ml/data/processed/dna_shape_cache/
 
 # Optional: Large model checkpoints (>100MB should use Git LFS, but .pth under 50MB is fine)
 # ml/models/*.pth
