@@ -34,3 +34,6 @@ Thumbs.db
 .idea/
 .env
 .env.*
+# Keep the example env file (the real ml/.env stays ignored)
+!.env.example
+!ml/.env.example

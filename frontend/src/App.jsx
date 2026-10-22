@@ -1,5 +1,16 @@
 import { useState } from 'react';
 import './App.css';
+import DnaHelix3D from './components/DnaHelix3D';
+import StructureViewer from './components/StructureViewer';
+import ChatPanel from './components/ChatPanel';
+import { summarisePrediction } from './lib/api';
+import { chip } from './components/ui';
+
+const VIEWS = [
+  { id: '3d', label: '3D DNA helix' },
+  { id: 'tracks', label: '2D tracks (saliency · ISM · motif)' },
+  { id: 'structure', label: 'Real protein–DNA structure' },
+];
 
 const NUCLEOTIDE_THEMES = {
   A: { bg: 'rgba(16, 185, 129, 0.15)', border: '#10b981', text: '#34d399', bar: '#10b981' },
@@ -23,6 +34,15 @@ export default function App() {
   const [shapeMatrix, setShapeMatrix] = useState(null);
   const [shapeLoading, setShapeLoading] = useState(false);
   const [shapeError, setShapeError] = useState(null);
+  const [view, setView] = useState('3d');
+  const [chatOpen, setChatOpen] = useState(false);
+  const [pendingQuestion, setPendingQuestion] = useState(null);
+
+  // "Ask the tutor about this" buttons in the 3D and structure views
+  const askTutor = (question) => {
+    setPendingQuestion(question);
+    setChatOpen(true);
+  };
 
   const getRandomBases = (len) => {
     const bases = ['A', 'C', 'G', 'T'];
@@ -295,7 +315,24 @@ export default function App() {
               </div>
             </div>
 
-            {result.visualizations?.saliency_map && (
+            <div role="tablist" aria-label="Explanation views" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {VIEWS.map((v) => (
+                <button
+                  key={v.id}
+                  role="tab"
+                  aria-selected={view === v.id}
+                  style={{ ...chip(view === v.id), padding: '8px 16px', fontSize: '13px' }}
+                  onClick={() => setView(v.id)}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+
+            {view === '3d' && <DnaHelix3D key={sequence} sequence={sequence} result={result} onAsk={askTutor} />}
+            {view === 'structure' && <StructureViewer result={result} onAsk={askTutor} />}
+
+            {view === 'tracks' && result.visualizations?.saliency_map && (
               <div className="panel analysis-panel">
                 <div className="panel-header tight">
                   <h3>1. ShiftSmooth Gradient Attribution Track</h3>
@@ -328,7 +365,7 @@ export default function App() {
               </div>
             )}
 
-            {result.visualizations?.in_silico_mutagenesis?.length > 0 && (
+            {view === 'tracks' && result.visualizations?.in_silico_mutagenesis?.length > 0 && (
               <div className="panel analysis-panel">
                 <h3 className="table-title">2. In Silico Mutagenesis (ISM)</h3>
                 <div className="table-wrap">
@@ -360,7 +397,7 @@ export default function App() {
               </div>
             )}
 
-            {result.visualizations?.sequence_logo && (
+            {view === 'tracks' && result.visualizations?.sequence_logo && (
               <div className="panel analysis-panel">
                 <h3 className="table-title">3. Learned Motif Frequency Weights</h3>
                 <div className="logo-grid">
@@ -380,6 +417,14 @@ export default function App() {
           </div>
         )}
       </main>
+
+      <ChatPanel
+        open={chatOpen}
+        onOpenChange={setChatOpen}
+        prediction={summarisePrediction(result, sequence)}
+        pendingQuestion={pendingQuestion}
+        onPendingHandled={() => setPendingQuestion(null)}
+      />
     </div>
   );
 }

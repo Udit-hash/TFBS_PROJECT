@@ -1,9 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, Field
 import torch
 import numpy as np
 
+import chatbot  # loads ml/.env (if present) before config reads TORCH_NUM_THREADS
 from config import DEVICE, SEQUENCE_LENGTH, MODEL_DIR
 from models.hybrid import TFBS_TriBranch
 from models.shape_fusion import TFBS_TriBranchShape
@@ -26,6 +29,18 @@ app.add_middleware(
 
 class SequenceInput(BaseModel):
     sequence: str
+
+
+class ChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatInput(BaseModel):
+    question: str = Field(..., min_length=1, max_length=1000)
+    mode: Literal["beginner", "advanced"] = "beginner"
+    history: List[ChatTurn] = []
+    prediction: Optional[dict] = None  # compact summary of the current /predict result
 
 KNOWN_MOTIFS = {
     "TATA_BOX": "TATAAA",
@@ -268,7 +283,7 @@ def calculate_ism(sequence: str, base_prob: float):
                 mutations.append({"pos": i, "from": orig_char, "to": b})
 
     if not mutated_matrices:
-        return []
+        return [], []
 
     x_tensor = torch.tensor(np.array(mutated_matrices), dtype=torch.float32, device=DEVICE)
     shape_tensor = None
@@ -298,8 +313,12 @@ def calculate_ism(sequence: str, base_prob: float):
         probs = torch.sigmoid(_forward_model(x_tensor, shape_tensor)).cpu().numpy()
 
     ism_results = []
+    # Per-position impact for the 3D view: the most damaging substitution at each position
+    position_effect = [0.0] * len(seq_list)
     for meta, p in zip(mutations, probs):
         delta = float(np.asarray(p).squeeze() - base_prob)
+        if delta < position_effect[meta["pos"]]:
+            position_effect[meta["pos"]] = round(delta, 4)
         if abs(delta) > 0.03:
             ism_results.append({
                 "position": meta["pos"],
@@ -307,7 +326,8 @@ def calculate_ism(sequence: str, base_prob: float):
                 "delta_p": round(delta, 4)
             })
 
-    return sorted(ism_results, key=lambda x: abs(x["delta_p"]), reverse=True)[:8]
+    top = sorted(ism_results, key=lambda x: abs(x["delta_p"]), reverse=True)[:8]
+    return top, position_effect
 
 # ============================================================
 # INTERPRETABILITY: 3. SEQUENCE LOGOS / JASPAR MOTIF MATCHING (Section IV-C)
@@ -356,8 +376,20 @@ async def root():
     return {
         "model": CURRENT_ARCH,
         "status": "operational",
-        "device": str(DEVICE)
+        "device": str(DEVICE),
+        "chatbot": "llm" if chatbot.llm_settings() else "offline"
     }
+
+
+@app.post("/chat")
+def chat(data: ChatInput):
+    """Beginner-friendly tutor that can explain the user's current prediction."""
+    return chatbot.answer(
+        question=data.question,
+        mode=data.mode,
+        history=[t.model_dump() for t in data.history],
+        prediction=data.prediction,
+    )
 
 
 @app.post("/dna-shape")
@@ -453,7 +485,7 @@ async def predict_tfbs(data: SequenceInput):
     detected = [name for name, motif in KNOWN_MOTIFS.items() if motif in seq]
     saliency = calculate_shiftsmooth_saliency(seq, shape_tensor)
     try:
-        ism = calculate_ism(seq, probability)
+        ism, ism_position_effect = calculate_ism(seq, probability)
     except DNAShapePredictionError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     motif_logo = extract_motif_logos(seq, saliency)
@@ -469,6 +501,7 @@ async def predict_tfbs(data: SequenceInput):
         "visualizations": {
             "saliency_map": saliency,
             "in_silico_mutagenesis": ism,
+            "ism_position_effect": ism_position_effect,
             "sequence_logo": motif_logo
         }
     }

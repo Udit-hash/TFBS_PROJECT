@@ -138,8 +138,10 @@ subset only and stores those statistics in the shape-model checkpoint.
 6. Run API inference from `ml`:
 
    ```powershell
-   uvicorn api:app --host 127.0.0.1 --port 8000
+   uvicorn api:app --host 127.0.0.1 --port 8001
    ```
+
+   (Port 8001 matches the `/api` proxy in `frontend/vite.config.js`.)
 
    Send the existing request shape, `{"sequence": "<101 A/C/G/T bases>"}`.
    In the frontend, click **Generate DNA shape matrix** to request the
@@ -198,3 +200,19 @@ synthetic generator is suitable only for pipeline smoke tests, not a
 biological performance claim. This model predicts sequence-context shape only;
 it does not account for methylation, protein-induced deformation, chromatin,
 or solution conditions.
+
+## Explanation views and DNA tutor
+
+After a prediction, the results area has three views:
+
+- **3D DNA helix** (`frontend/src/components/DnaHelix3D.jsx`): the input sequence drawn as idealised B-DNA. Each base pair is coloured by ShiftSmooth importance, by in-silico-mutation impact (`ism_position_effect` from `/predict`), or by base identity. The dashed lines are the Watson–Crick hydrogen bonds (A–T 2, G–C 3). Click a base pair for its details and an "Ask the tutor" shortcut. It is drawn with plain canvas and redraws only when you interact with it, with no animation loop and no 3D library.
+- **2D tracks**: the saliency, ISM and motif panels above.
+- **Real protein–DNA structure** (`StructureViewer.jsx`): loads an experimental PDB complex for the matching protein family (1CDW TBP–TATA, 1AAY Zif268 zinc fingers as an SP1-family example, 4AWL NF-Y–CCAAT, 1DH3 CREB–CRE, 5KKQ CTCF). Protein residues within 3.5 Å of the DNA are highlighted. 3Dmol.js is loaded from 3Dmol.org only when this tab is opened, so the tab needs an internet connection. These are reference structures, not predictions for the input sequence.
+
+The **DNA tutor** (`ml/chatbot/`, endpoint `POST /chat`) explains DNA, transcription factors, the model and the user's current result in Beginner or Advanced mode. It answers "why is position N important?" from that prediction's saliency and ISM values. Without an API key it answers offline from `ml/chatbot/knowledge_base.json`. For fuller AI answers, copy `ml/.env.example` to `ml/.env` and add a free Groq or Gemini key. `ml/.env` is git-ignored. Tests: `cd ml && python -m unittest tests.test_chatbot`.
+
+### Running on a laptop
+
+- Train in Google Colab, not on a laptop. The API only needs the saved checkpoints.
+- PyTorch is capped at 2 CPU threads (`TORCH_NUM_THREADS`).
+- Stop the backend and the frontend with **Ctrl+C**. Nothing keeps running in the background afterwards.

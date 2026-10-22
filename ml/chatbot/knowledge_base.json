@@ -1,0 +1,170 @@
+[
+  {
+    "id": "dna_basics",
+    "title": "What is DNA?",
+    "keywords": ["dna", "nucleotide", "base", "bases", "genome", "double helix", "helix", "strand", "basics", "what is dna"],
+    "beginner": "DNA is the instruction manual of a cell. It is a long molecule written in an alphabet of only four letters, called bases: A (adenine), C (cytosine), G (guanine) and T (thymine). Two DNA strands wind around each other into a twisted ladder called the double helix. The sides of the ladder are a sugar-phosphate backbone, and each rung is a pair of bases.",
+    "advanced": "DNA is a polymer of deoxyribonucleotides. Two antiparallel strands (5'→3' and 3'→5') form a right-handed B-form double helix with about 10.5 base pairs per turn and a rise of about 3.4 Å per base pair. The helix has a wide major groove and a narrow minor groove, which expose different chemical groups on the edges of the base pairs."
+  },
+  {
+    "id": "base_pairing",
+    "title": "Base pairing and hydrogen bonds",
+    "keywords": ["base pair", "pairing", "hydrogen", "hydrogen bond", "bond", "bonds", "complementary", "a-t", "g-c", "at", "gc", "watson", "crick"],
+    "beginner": "The two DNA strands hold together because the bases pair up in a fixed way: A always pairs with T, and G always pairs with C. They stick together through weak attractions called hydrogen bonds. An A–T pair has 2 hydrogen bonds and a G–C pair has 3, which makes G–C pairs a little stronger. In the 3D view, the thin dashed lines between the two strands are these hydrogen bonds.",
+    "advanced": "Watson–Crick pairing: A·T pairs form two hydrogen bonds (N6–H···O4 and N1···H–N3) and G·C pairs form three (O6···H–N4, N1–H···N3, N2–H···O2). Base stacking between neighbouring pairs contributes most of the helix's stability; hydrogen bonds mainly provide specificity. GC-rich regions have higher melting temperatures."
+  },
+  {
+    "id": "transcription_factor",
+    "title": "What is a transcription factor?",
+    "keywords": ["transcription factor", "tf", "tfs", "protein", "regulate", "gene expression", "switch", "transcription"],
+    "beginner": "A transcription factor (TF) is a protein that works like a switch for genes. It finds a specific short 'word' in the DNA, sticks to it, and then helps turn a nearby gene on or off. Humans have about 1,600 different transcription factors, and each one recognises its own DNA word.",
+    "advanced": "Transcription factors are sequence-specific DNA-binding proteins that regulate RNA polymerase recruitment and activity. They are grouped into families by their DNA-binding domain (e.g. C2H2 zinc fingers, homeodomains, bZIP, bHLH, nuclear receptors). Binding specificity comes from direct readout (hydrogen bonds and van der Waals contacts with base edges, mostly in the major groove) and indirect readout (DNA shape, such as minor-groove width and flexibility)."
+  },
+  {
+    "id": "tfbs",
+    "title": "What is a transcription factor binding site (TFBS)?",
+    "keywords": ["tfbs", "binding site", "binding sites", "site", "bind", "binding", "where does it bind"],
+    "beginner": "A transcription factor binding site (TFBS) is the exact spot in the DNA where a transcription factor sticks. It is usually short, about 6–20 letters long. Finding these spots tells scientists which genes a TF can control. This project predicts whether a 101-letter piece of DNA contains such a spot.",
+    "advanced": "A TFBS is a genomic region occupied by a TF, typically containing a core motif of 6–20 bp, often with flanking sequence that tunes affinity. Real occupancy also depends on chromatin accessibility, cooperative binding and cell type, which sequence-only models such as this one do not see directly."
+  },
+  {
+    "id": "motif",
+    "title": "What is a motif?",
+    "keywords": ["motif", "motifs", "pattern", "consensus", "word", "core"],
+    "beginner": "A motif is the short DNA 'word' that a transcription factor likes to bind, such as TATAAA. TFs are a bit flexible, so a motif is really a family of similar words. Some positions must be one exact letter, and others can be a few different letters.",
+    "advanced": "A motif is a probabilistic description of a TF's preferred binding sequences, usually written as a position frequency matrix (PFM) or position weight matrix (PWM) and shown as a sequence logo. Consensus strings like TATAWAWR use IUPAC codes for degenerate positions."
+  },
+  {
+    "id": "sequence_logo",
+    "title": "Sequence logos and frequency matrices",
+    "keywords": ["logo", "sequence logo", "pfm", "pwm", "frequency matrix", "information content", "bits", "matrix"],
+    "beginner": "A sequence logo is a picture of a motif. At each position, letters are stacked, and bigger letters are more important. A tall single letter means the TF really needs that letter at that spot. Short, mixed letters mean that spot doesn't matter much.",
+    "advanced": "A sequence logo plots, for each motif position, the information content (2 − entropy, in bits) as the stack height, with each letter's height proportional to its frequency. It is computed from a PFM, often with a background correction. In CNN interpretation, logos can be built by aligning input windows that strongly activate a convolutional filter."
+  },
+  {
+    "id": "jaspar",
+    "title": "JASPAR database",
+    "keywords": ["jaspar", "database", "ma0108", "ma0079", "matrix id", "tomtom", "known motif"],
+    "beginner": "JASPAR is a free online library of known transcription factor motifs. If our model highlights a DNA word, we can look it up in JASPAR to see which known TF it resembles, like checking a word in a dictionary.",
+    "advanced": "JASPAR is an open-access, curated database of non-redundant TF binding profiles stored as PFMs (IDs like MA0108 for TBP). Learned motifs are usually matched to JASPAR with Tomtom, which reports p-values and E-values for motif–motif similarity."
+  },
+  {
+    "id": "chipseq",
+    "title": "ChIP-seq and ENCODE",
+    "keywords": ["chip-seq", "chipseq", "chip", "encode", "experiment", "data", "dataset", "peak", "peaks", "training data"],
+    "beginner": "ChIP-seq is a lab experiment that finds where a transcription factor sits on the DNA in real cells. ENCODE is a large public project that ran thousands of these experiments. Their results are like an answer key: the model learns from DNA pieces we already know are bound or not bound.",
+    "advanced": "Chromatin immunoprecipitation followed by sequencing (ChIP-seq) cross-links proteins to DNA, pulls down a target TF with an antibody, and sequences the bound fragments. Peak callers identify enriched regions. ENCODE provides standardised ChIP-seq peaks for many TFs and cell lines. Benchmarks typically take a fixed-length window around peak summits (for example 101 bp) as positives, and shuffled or background sequences as negatives."
+  },
+  {
+    "id": "one_hot",
+    "title": "How DNA is fed to the model (one-hot encoding)",
+    "keywords": ["one-hot", "one hot", "encoding", "encode", "input", "matrix", "4 x 101", "numbers"],
+    "beginner": "Computers need numbers, not letters, so each DNA letter is turned into four switches: A = 1000, C = 0100, G = 0010, T = 0001. A 101-letter sequence becomes a small grid of 4 rows and 101 columns that the neural network can read.",
+    "advanced": "The input is a 4 × L binary matrix (L = 101 here) with channels A, C, G, T. One-hot encoding avoids implying an order between bases and lets 1D convolutions act as learnable PWM scanners."
+  },
+  {
+    "id": "cnn",
+    "title": "CNN branch",
+    "keywords": ["cnn", "convolution", "convolutional", "filter", "filters", "kernel", "local", "scanner"],
+    "beginner": "The CNN part of the model works like a set of magnifying glasses that slide along the DNA looking for short patterns. Our model uses three sizes of magnifying glass (8, 16 and 24 letters wide), so it can spot both short and longer patterns.",
+    "advanced": "The CNN branch applies parallel Conv1d layers with kernel widths of 8, 16 and 24 (16 filters each, 48 channels in total), followed by batch normalisation and max pooling. Each first-layer filter behaves like a learned PWM. Global max pooling gives a position-invariant summary of motif presence."
+  },
+  {
+    "id": "bilstm",
+    "title": "BiLSTM branch",
+    "keywords": ["lstm", "bilstm", "recurrent", "rnn", "bidirectional", "context", "long-range", "memory"],
+    "beginner": "The BiLSTM part reads the patterns found by the CNN from left to right and from right to left, a bit like reading a sentence both ways. This helps it understand context, for example whether two patterns appear near each other.",
+    "advanced": "A single-layer bidirectional LSTM (hidden size 32 per direction) processes the pooled CNN feature sequence to capture order-dependent, longer-range interactions between motifs, such as spacing and orientation. Its outputs are max-pooled over positions."
+  },
+  {
+    "id": "transformer",
+    "title": "Transformer / self-attention branch",
+    "keywords": ["transformer", "attention", "self-attention", "multi-head", "global", "positional encoding"],
+    "beginner": "The transformer part lets every position in the DNA 'look at' every other position at once and decide which ones matter together. This is the same idea behind modern AI chatbots, applied to DNA.",
+    "advanced": "One pre-LayerNorm Transformer encoder layer (d_model = 48, 4 heads, sinusoidal positional encoding) operates on the CNN feature tokens. It computes softmax(QKᵀ/√d_k)V to model global pairwise dependencies. The CNN, BiLSTM and Transformer representations are concatenated (160-d) and passed to a dense classifier."
+  },
+  {
+    "id": "probability",
+    "title": "What the binding probability means",
+    "keywords": ["probability", "score", "percent", "confidence", "threshold", "0.5", "prediction", "result", "verdict", "how sure"],
+    "beginner": "The binding probability is the model's confidence that this DNA piece contains a binding site. 90% means 'very likely', and 10% means 'very unlikely'. Anything above 50% is labelled a potential binding site. It is a prediction, not a lab result.",
+    "advanced": "The score is sigmoid(logit) from the classifier, thresholded at 0.5. It is not necessarily well calibrated. Calibration (e.g. temperature scaling) and threshold tuning on a validation set would make the number more trustworthy as a probability. It reflects sequence-only evidence and ignores chromatin context."
+  },
+  {
+    "id": "saliency",
+    "title": "Saliency maps and ShiftSmooth",
+    "keywords": ["saliency", "gradient", "attribution", "importance", "shiftsmooth", "smoothgrad", "heatmap", "explain", "why", "highlight", "colour", "color", "important positions"],
+    "beginner": "A saliency map shows which DNA letters the model paid the most attention to. Brighter or taller means 'this letter mattered more for the decision'. ShiftSmooth repeats the calculation with the DNA nudged slightly left and right and averages the results, so the highlights are less noisy.",
+    "advanced": "Saliency is the gradient of the output logit with respect to the one-hot input, here reduced as the max absolute gradient across the four channels per position. ShiftSmooth averages these attributions over small cyclic shifts (−2…+2 bp) and re-aligns them, reducing high-frequency noise. Gradient × input or Integrated Gradients would give signed, base-specific attributions."
+  },
+  {
+    "id": "ism",
+    "title": "In silico mutagenesis (ISM)",
+    "keywords": ["ism", "mutagenesis", "mutation", "mutate", "mutations", "snp", "variant", "delta", "change", "what if"],
+    "beginner": "In silico mutagenesis means 'mutations done on a computer'. We change one DNA letter at a time to each of the other three letters and ask the model again. If the score drops a lot, that letter was important for binding. It's like removing one brick to see whether the wall falls.",
+    "advanced": "ISM evaluates all 3L single-nucleotide substitutions (303 for L = 101) and records Δp = p(mutant) − p(reference). Large negative Δp marks positions essential for binding. Unlike gradients, ISM measures the actual effect of a discrete change, which makes it the standard way to estimate variant effects."
+  },
+  {
+    "id": "major_groove",
+    "title": "How proteins physically read DNA (grooves)",
+    "keywords": ["groove", "major groove", "minor groove", "contact", "recognise", "recognize", "read", "physical", "structure", "3d", "shape"],
+    "beginner": "DNA's twisted shape has two grooves: a wide one (major groove) and a narrow one (minor groove). Transcription factors usually slide part of themselves into a groove and 'feel' the edges of the bases there, like reading Braille. That's how they recognise their DNA word without unzipping the DNA.",
+    "advanced": "Most TFs read sequence in the major groove, where each base pair shows a distinct pattern of hydrogen-bond donors, acceptors and methyl groups. Some, like TBP, bind the minor groove and strongly bend the DNA. DNA shape features (minor-groove width, roll, propeller twist, helix twist) capture this indirect readout."
+  },
+  {
+    "id": "3d_view_caveat",
+    "title": "What the 3D view does and doesn't show",
+    "keywords": ["3d", "3d view", "visualization", "helix view", "structure view", "is it real", "accurate", "pdb", "crystal"],
+    "beginner": "The 3D helix is a picture of your DNA sequence, with each base pair coloured by how important the model thinks it is. The model only reads letters. It doesn't simulate atoms. The 'Real structure' tab shows an actual lab-measured 3D shape of a protein bound to DNA, so you can see what binding physically looks like.",
+    "advanced": "The helix is an idealised B-DNA model generated from the sequence. Colours map model attributions (ShiftSmooth saliency or ISM) onto base pairs, and the hydrogen bonds drawn are the canonical Watson–Crick counts, not computed contacts. The structure tab loads experimental PDB complexes (e.g. 1CDW for TBP–TATA) for comparison. The model has no structural input, so any overlap between important bases and protein contacts is a sanity check, not a mechanism."
+  },
+  {
+    "id": "tata_box",
+    "title": "TATA box and TBP",
+    "keywords": ["tata", "tata box", "tbp", "tataaa", "promoter", "ma0108"],
+    "beginner": "The TATA box is a short DNA word (like TATAAA) found in many gene promoters, the 'start here' sign in front of a gene. A protein called TBP (TATA-binding protein) grabs it, which helps the cell's machinery start reading the gene.",
+    "advanced": "The TATA box (consensus TATAWAWR) sits about 25–30 bp upstream of the transcription start site in many promoters. TBP, part of TFIID, binds the minor groove using a saddle-shaped β-sheet and bends the DNA by about 80°. JASPAR MA0108 is the TBP profile. PDB 1CDW is human TBP bound to a TATA element."
+  },
+  {
+    "id": "gc_box",
+    "title": "GC box and SP1",
+    "keywords": ["gc box", "sp1", "gggcgg", "zinc finger", "ma0079", "gc-rich"],
+    "beginner": "The GC box is a G- and C-rich DNA word (like GGGCGG) that is recognised by a protein called SP1. SP1 uses little finger-shaped parts called zinc fingers to grip the DNA.",
+    "advanced": "SP1 binds GC boxes (GGGGCGGGG) through three C2H2 zinc fingers, each reading about 3 bp in the major groove. JASPAR MA0079 is the SP1 profile. The structure tab shows Zif268/EGR1 (PDB 1AAY), a closely related three-finger protein, because it is the classic, well-resolved example of zinc-finger DNA recognition."
+  },
+  {
+    "id": "caat_box",
+    "title": "CCAAT box and NF-Y",
+    "keywords": ["caat", "ccaat", "caat box", "nf-y", "nfy"],
+    "beginner": "The CCAAT box is another common 'start here' sign in gene promoters. It is recognised by a three-part protein complex called NF-Y.",
+    "advanced": "The CCAAT box sits about 60–100 bp upstream of the TSS in many promoters. NF-Y (NF-YA/NF-YB/NF-YC) binds it. NF-YB/NF-YC form a histone-like dimer that bends the DNA, while NF-YA inserts into the minor groove to read CCAAT specifically (PDB 4AWL)."
+  },
+  {
+    "id": "creb",
+    "title": "CRE and CREB",
+    "keywords": ["creb", "cre", "tgacgtca", "bzip", "camp"],
+    "beginner": "CREB is a transcription factor that switches on genes when a cell receives certain signals, for example in memory formation in the brain. It binds the DNA word TGACGTCA.",
+    "advanced": "CREB is a bZIP factor that binds the palindromic cAMP response element (TGACGTCA) as a dimer, with its basic region α-helices in the major groove (PDB 1DH3). Its activity is regulated by phosphorylation at Ser133."
+  },
+  {
+    "id": "ctcf",
+    "title": "CTCF",
+    "keywords": ["ctcf", "ccctc", "insulator", "loop", "3d genome"],
+    "beginner": "CTCF is a protein that helps fold DNA into loops inside the cell nucleus. It acts like a bookmark that separates neighbourhoods of genes.",
+    "advanced": "CTCF uses 11 C2H2 zinc fingers. ZFs 3–7 bind the core ~15 bp motif (e.g. CCGCGNGGNGGCAG) in the major groove (PDB 5KKQ). CTCF anchors cohesin-mediated chromatin loops and insulates topologically associating domains."
+  },
+  {
+    "id": "project_overview",
+    "title": "About this project",
+    "keywords": ["project", "this tool", "how does it work", "pipeline", "workflow", "what does this do", "overview", "app"],
+    "beginner": "You paste a 101-letter DNA sequence. The AI model, a mix of three neural networks (CNN, BiLSTM and Transformer), predicts whether a transcription factor is likely to bind there. It then explains its answer by highlighting the important letters, testing mutations, and showing the result on a 3D DNA model.",
+    "advanced": "Pipeline: 101 bp input → one-hot (4 × 101) → tri-branch CNN (8/16/24) + BiLSTM + Transformer → fused 160-d representation → sigmoid binding probability. Explanations: ShiftSmooth saliency, ISM (303 substitutions), a saliency-derived core window with motif lookup, and 3D mapping of attributions."
+  },
+  {
+    "id": "limitations",
+    "title": "Limitations of the model",
+    "keywords": ["limitation", "limitations", "wrong", "trust", "reliable", "accuracy", "medical", "clinical", "diagnosis"],
+    "beginner": "The model is a research tool, not a medical test. It only looks at the DNA letters, not at everything happening in a real cell. Predictions can be wrong and should be checked with lab experiments.",
+    "advanced": "Known limitations: sequence-only input (no chromatin accessibility, methylation or cofactors), fixed 101 bp context, uncalibrated probabilities, and performance tied to the training data. Gradient-based attributions can be noisy or saturate. Results are not for clinical use."
+  }
+]

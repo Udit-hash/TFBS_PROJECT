@@ -1,5 +1,10 @@
+import os
 from pathlib import Path
 import torch
+
+# Keep laptops cool: cap the CPU threads PyTorch may use (default 2).
+# Override with the TORCH_NUM_THREADS environment variable (or in ml/.env).
+torch.set_num_threads(int(os.environ.get("TORCH_NUM_THREADS", "2")))
 
 
 # ============================================================
