@@ -31,9 +31,6 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [uploadedFile, setUploadedFile] = useState('');
-  const [shapeMatrix, setShapeMatrix] = useState(null);
-  const [shapeLoading, setShapeLoading] = useState(false);
-  const [shapeError, setShapeError] = useState(null);
   const [view, setView] = useState('3d');
   const [chatOpen, setChatOpen] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState(null);
@@ -56,8 +53,6 @@ export default function App() {
     setResult(null);
     setError(null);
     setUploadedFile('');
-    setShapeMatrix(null);
-    setShapeError(null);
 
     if (type === 'positive') {
       const selected = MOTIF_POOL[Math.floor(Math.random() * MOTIF_POOL.length)];
@@ -80,8 +75,6 @@ export default function App() {
     setError(null);
     setResult(null);
     setUploadedFile('');
-    setShapeMatrix(null);
-    setShapeError(null);
 
     if (!/\.(fa|fasta|fna|txt)$/i.test(file.name)) {
       setError('Choose a FASTA or text file containing one DNA sequence.');
@@ -146,36 +139,6 @@ export default function App() {
     }
   };
 
-  const handleShapeMatrix = async () => {
-    setShapeError(null);
-    setShapeMatrix(null);
-    if (sequence.length !== 101) {
-      setShapeError(`Sequence length must be exactly 101 bp. Current length: ${sequence.length} bp.`);
-      return;
-    }
-
-    setShapeLoading(true);
-    try {
-      const res = await fetch('/api/dna-shape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sequence })
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `DNA-shape prediction failed (${res.status})`);
-      }
-
-      setShapeMatrix(await res.json());
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to generate the DNA-shape matrix.';
-      setShapeError(message);
-    } finally {
-      setShapeLoading(false);
-    }
-  };
-
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -216,8 +179,6 @@ export default function App() {
             onChange={(e) => {
               setSequence(e.target.value.toUpperCase().replace(/[^ATCG]/g, ''));
               setUploadedFile('');
-              setShapeMatrix(null);
-              setShapeError(null);
               if (result) setResult(null);
             }}
             rows={3}
@@ -225,7 +186,7 @@ export default function App() {
           />
           <div className="input-hint">
             {uploadedFile
-              ? `Loaded ${uploadedFile}. You can generate a DNAshapeR feature matrix for this sequence.`
+              ? `Loaded ${uploadedFile}.`
               : 'Upload a single FASTA record (.fa, .fasta, .fna) or paste a 101 bp sequence.'}
           </div>
 
@@ -241,51 +202,10 @@ export default function App() {
             >
               {loading ? 'Executing Tri-Branch Pipeline...' : 'Run Binding Inference'}
             </button>
-            <button
-              className="secondary-button"
-              onClick={handleShapeMatrix}
-              disabled={shapeLoading || sequence.length !== 101}
-            >
-              {shapeLoading ? 'Generating shape matrix...' : 'Generate DNA shape matrix'}
-            </button>
           </div>
 
           {error && <div className="alert error">{error}</div>}
-          {shapeError && <div className="alert error">{shapeError}</div>}
         </section>
-
-        {shapeMatrix && (
-          <section className="panel analysis-panel">
-            <div className="panel-header tight">
-              <h3>DNA Shape Feature Matrix</h3>
-              <span>{shapeMatrix.predictor} {shapeMatrix.predictor_version}</span>
-            </div>
-            <p className="shape-description">
-              Predicted structural features for the entered sequence. Each row is a native DNAshapeR position;
-              blank cells indicate positions not defined for that feature.
-            </p>
-            <div className="table-wrap shape-matrix-scroll">
-              <table className="shape-table">
-                <thead>
-                  <tr>
-                    <th>Position</th>
-                    {shapeMatrix.feature_names.map((feature) => <th key={feature}>{feature}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {shapeMatrix.rows.map((row) => (
-                    <tr key={row.position}>
-                      <td>{row.position}</td>
-                      {shapeMatrix.feature_names.map((feature) => (
-                        <td key={feature}>{row[feature] ?? '—'}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
 
         {result && (
           <div className="results-stack">

@@ -9,8 +9,6 @@ import numpy as np
 import chatbot  # loads ml/.env (if present) before config reads TORCH_NUM_THREADS
 from config import DEVICE, SEQUENCE_LENGTH, MODEL_DIR
 from models.hybrid import TFBS_TriBranch
-from models.shape_fusion import TFBS_TriBranchShape
-from dna_shape import DNAShapePredictionError, DNAshapeRPredictor, FEATURE_NAMES
 from preprocessing import one_hot_encode
 
 app = FastAPI(
@@ -53,12 +51,6 @@ KNOWN_MOTIFS = {
 # ============================================================
 HYBRID_PATH = MODEL_DIR / "best_hybrid.pth"
 CNN_PATH = MODEL_DIR / "best_cnn.pth"
-SHAPE_PATH = MODEL_DIR / "best_shape_fusion.pth"
-shape_predictor = None
-shape_matrix_predictor = DNAshapeRPredictor()
-SHAPE_MODEL_ACTIVE = False
-SHAPE_POSITIONS = None
-SHAPE_NATIVE_LENGTHS = None
 
 
 def _load_hybrid_checkpoint(checkpoint):
@@ -120,57 +112,7 @@ def _load_hybrid_checkpoint(checkpoint):
         return compatible_model
 
 
-if SHAPE_PATH.exists():
-    checkpoint = torch.load(SHAPE_PATH, map_location=DEVICE)
-    expected_names = tuple(checkpoint.get("shape_feature_names", ()))
-    if checkpoint.get("model_type") != "tri_branch_dna_shape":
-        raise RuntimeError(f"Unsupported DNA-shape checkpoint: {SHAPE_PATH}")
-    if checkpoint.get("sequence_length") != SEQUENCE_LENGTH:
-        raise RuntimeError(
-            f"DNA-shape checkpoint expects {checkpoint.get('sequence_length')} bp; "
-            f"the current API is configured for {SEQUENCE_LENGTH} bp."
-        )
-    if expected_names != FEATURE_NAMES:
-        raise RuntimeError(
-            f"DNA-shape checkpoint features {expected_names} do not match "
-            f"{FEATURE_NAMES}."
-        )
-    shape_native_lengths = tuple(
-        checkpoint.get("shape_native_lengths", ())
-    )
-    if len(shape_native_lengths) != len(FEATURE_NAMES) or min(
-        shape_native_lengths, default=0
-    ) < 1:
-        raise RuntimeError(
-            "DNA-shape checkpoint must store a native position count per feature."
-        )
-    shape_mean = torch.tensor(checkpoint["shape_mean"], dtype=torch.float32)
-    shape_std = torch.tensor(checkpoint["shape_std"], dtype=torch.float32)
-    model = TFBS_TriBranchShape(
-        seq_len=SEQUENCE_LENGTH,
-        shape_mean=shape_mean,
-        shape_std=shape_std,
-    )
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model = model.to(DEVICE)
-    model.eval()
-    shape_predictor = shape_matrix_predictor
-    if shape_predictor.version != checkpoint.get("shape_predictor_version"):
-        raise RuntimeError(
-            "Installed DNAshapeR version does not match the version used to "
-            "train the shape-fusion checkpoint."
-        )
-    CURRENT_ARCH = "CNN + BiLSTM + Transformer + DNAshapeR"
-    SHAPE_MODEL_ACTIVE = True
-    SHAPE_POSITIONS = int(checkpoint.get("shape_positions", 0))
-    SHAPE_NATIVE_LENGTHS = shape_native_lengths
-    if SHAPE_POSITIONS != max(shape_native_lengths):
-        raise RuntimeError(
-            "DNA-shape checkpoint max position count does not match its "
-            "per-feature native lengths."
-        )
-    print(f"Loading DNA-shape fusion model from {SHAPE_PATH}")
-elif HYBRID_PATH.exists():
+if HYBRID_PATH.exists():
     MODEL_PATH = HYBRID_PATH
     CURRENT_ARCH = "CNN + BiLSTM + Transformer"
     print(f"Loading Hybrid Model from {MODEL_PATH}")
@@ -212,11 +154,7 @@ model.eval()
 print(f"Model successfully operational: {CURRENT_ARCH}")
 
 
-def _forward_model(x, shape_features=None):
-    if SHAPE_MODEL_ACTIVE:
-        if shape_features is None:
-            raise RuntimeError("DNA-shape features are required by the loaded model.")
-        return model(x, shape_features)
+def _forward_model(x):
     return model(x)
 
 
@@ -225,7 +163,6 @@ def _forward_model(x, shape_features=None):
 # ============================================================
 def calculate_shiftsmooth_saliency(
     sequence: str,
-    shape_features=None,
     num_shifts: int = 5,
     max_shift: int = 2,
 ):
@@ -245,7 +182,7 @@ def calculate_shiftsmooth_saliency(
         x = shifted_tensor.unsqueeze(0).clone().detach().requires_grad_(True)
         
         model.zero_grad()
-        out = _forward_model(x, shape_features)
+        out = _forward_model(x)
         out.backward()
         
         # Extract gradient and roll back to original alignment
@@ -286,31 +223,8 @@ def calculate_ism(sequence: str, base_prob: float):
         return [], []
 
     x_tensor = torch.tensor(np.array(mutated_matrices), dtype=torch.float32, device=DEVICE)
-    shape_tensor = None
-    if SHAPE_MODEL_ACTIVE:
-        if shape_predictor is None:
-            raise RuntimeError("DNAshapeR predictor is unavailable.")
-        mutated_sequences = [
-            "".join(
-                (mutation["to"] if position == mutation["pos"] else base)
-                for position, base in enumerate(sequence)
-            )
-            for mutation in mutations
-        ]
-        shape_batch = shape_predictor.predict_batch(mutated_sequences)
-        if (
-            shape_batch.values.shape[2] != SHAPE_POSITIONS
-            or shape_batch.native_lengths != SHAPE_NATIVE_LENGTHS
-        ):
-            raise DNAShapePredictionError(
-                "DNAshapeR returned native feature dimensions that differ "
-                "from the shape model."
-            )
-        shape_tensor = torch.tensor(
-            shape_batch.values, dtype=torch.float32, device=DEVICE
-        )
     with torch.no_grad():
-        probs = torch.sigmoid(_forward_model(x_tensor, shape_tensor)).cpu().numpy()
+        probs = torch.sigmoid(_forward_model(x_tensor)).cpu().numpy()
 
     ism_results = []
     # Per-position impact for the 3D view: the most damaging substitution at each position
@@ -392,44 +306,6 @@ def chat(data: ChatInput):
     )
 
 
-@app.post("/dna-shape")
-async def predict_dna_shape(data: SequenceInput):
-    seq = data.sequence.strip().upper()
-    if len(seq) != SEQUENCE_LENGTH or not all(c in "ATCG" for c in seq):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Sequence must be exactly {SEQUENCE_LENGTH} bp containing "
-                "A, T, C, G."
-            ),
-        )
-
-    try:
-        shape = shape_matrix_predictor.predict(seq)
-    except DNAShapePredictionError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    rows = []
-    for position in range(shape.values.shape[1]):
-        row = {"position": position + 1}
-        for index, feature_name in enumerate(FEATURE_NAMES):
-            value = shape.values[index, position]
-            row[feature_name] = (
-                round(float(value), 4)
-                if position < shape.native_lengths[index] and np.isfinite(value)
-                else None
-            )
-        rows.append(row)
-
-    return {
-        "predictor": shape.predictor,
-        "predictor_version": shape.predictor_version,
-        "feature_names": list(shape.feature_names),
-        "native_lengths": list(shape.native_lengths),
-        "rows": rows,
-    }
-
-
 @app.post("/predict")
 async def predict_tfbs(data: SequenceInput):
     seq = data.sequence.strip().upper()
@@ -439,55 +315,16 @@ async def predict_tfbs(data: SequenceInput):
 
     encoded = one_hot_encode(seq)
     x = torch.tensor(encoded, dtype=torch.float32, device=DEVICE).unsqueeze(0)
-    shape_tensor = None
-    shape_metadata = None
-    if SHAPE_MODEL_ACTIVE:
-        if shape_predictor is None:
-            raise RuntimeError("DNAshapeR predictor is unavailable.")
-        try:
-            shape_batch = shape_predictor.predict_batch([seq])
-        except DNAShapePredictionError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-        if shape_batch.values.shape[2] != SHAPE_POSITIONS:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "DNAshapeR returned a different number of native positions "
-                    "than the shape model was trained with."
-                ),
-            )
-        if shape_batch.native_lengths != SHAPE_NATIVE_LENGTHS:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "DNAshapeR returned per-feature native lengths different "
-                    "from those used to train the shape model."
-                ),
-            )
-        shape_tensor = torch.tensor(
-            shape_batch.values, dtype=torch.float32, device=DEVICE
-        )
-        shape_metadata = {
-            "predictor": shape_batch.predictor,
-            "predictor_version": shape_batch.predictor_version,
-            "feature_names": list(shape_batch.feature_names),
-            "native_position_count": int(shape_batch.values.shape[2]),
-            "native_lengths": list(shape_batch.native_lengths),
-        }
-
     with torch.no_grad():
-        logits = _forward_model(x, shape_tensor)
+        logits = _forward_model(x)
         probability = torch.sigmoid(logits).item()
 
     prediction = 1 if probability >= 0.5 else 0
     prediction_label = "Potential TF Binding Site" if prediction == 1 else "Low TF Binding Potential"
 
     detected = [name for name, motif in KNOWN_MOTIFS.items() if motif in seq]
-    saliency = calculate_shiftsmooth_saliency(seq, shape_tensor)
-    try:
-        ism, ism_position_effect = calculate_ism(seq, probability)
-    except DNAShapePredictionError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    saliency = calculate_shiftsmooth_saliency(seq)
+    ism, ism_position_effect = calculate_ism(seq, probability)
     motif_logo = extract_motif_logos(seq, saliency)
 
     response = {
@@ -505,8 +342,6 @@ async def predict_tfbs(data: SequenceInput):
             "sequence_logo": motif_logo
         }
     }
-    if shape_metadata is not None:
-        response["dna_shape"] = shape_metadata
     return response
 
 if __name__ == "__main__":

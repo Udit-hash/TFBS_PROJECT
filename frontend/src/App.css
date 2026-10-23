@@ -199,26 +199,6 @@
   cursor: not-allowed;
 }
 
-.secondary-button {
-  border: 1px solid rgba(125, 211, 252, 0.35);
-  border-radius: 12px;
-  background: rgba(14, 165, 233, 0.06);
-  color: #7dd3fc;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 12px 18px;
-  transition: background 0.2s ease, opacity 0.2s ease;
-}
-
-.secondary-button:hover:not(:disabled) {
-  background: rgba(14, 165, 233, 0.12);
-}
-
-.secondary-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .alert {
   margin-top: 16px;
   padding: 12px 14px;
@@ -401,37 +381,6 @@
   overflow-x: auto;
 }
 
-.shape-matrix-scroll {
-  max-height: 280px;
-  overflow: auto;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 10px;
-}
-
-.shape-matrix-scroll thead {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: #0f172a;
-}
-
-.shape-description {
-  margin: -4px 0 16px;
-  color: #94a3b8;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.shape-table {
-  min-width: 520px;
-}
-
-.shape-table th:not(:first-child),
-.shape-table td:not(:first-child) {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 table {
   width: 100%;
   border-collapse: collapse;
@@ -514,10 +463,6 @@ th {
   }
 
   .primary-button {
-    width: 100%;
-  }
-
-  .secondary-button {
     width: 100%;
   }
 }

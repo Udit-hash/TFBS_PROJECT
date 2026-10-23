@@ -1,5 +1,5 @@
 """
-Train and compare every model on the real dataset with 5-fold cross-validation.
+Train and compare all three models on the real dataset with 5-fold cross-validation.
 
 What it does (in plain words):
   * The official test set (test_clean.csv) is kept aside and never used for training.
@@ -14,16 +14,13 @@ What it does (in plain words):
     rerun the same command and it continues where it stopped.
 
 Models:
-  cnn          - CNN baseline (TFBS_CNN)
-  cnn_bilstm   - CNN + BiLSTM (TFBS_CNN_BiLSTM)
-  tri_branch   - CNN + BiLSTM + Transformer (TFBS_TriBranch), the main model
-  shape        - tri_branch + DNA shape (TFBS_TriBranchShape). Optional: needs the
-                 DNAshapeR features made by prepare_shape_dataset.py (needs R).
+  cnn          - CNN baseline (models/cnn.py)
+  cnn_bilstm   - CNN + BiLSTM (models/cnn_bilstm.py)
+  tri_branch   - CNN + BiLSTM + Transformer (models/hybrid.py), the main model
 
 Usage (from the ml/ folder):
-  python train_all.py --quick                 # 2-minute smoke test
-  python train_all.py                         # full run, 3 sequence models
-  python train_all.py --with-shape            # also the DNA-shape model
+  python train_all.py --quick      # 2-minute check that everything works
+  python train_all.py              # full run
 """
 
 from __future__ import annotations
@@ -47,22 +44,20 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.model_selection import StratifiedKFold
+from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from config import DEVICE, MODEL_DIR, PROCESSED_DATA_DIR, RANDOM_SEED, SEQUENCE_LENGTH
+from config import DEVICE, LEARNING_RATE, PROCESSED_DATA_DIR, RANDOM_SEED, SEQUENCE_LENGTH
 from models.cnn import TFBS_CNN
 from models.cnn_bilstm import TFBS_CNN_BiLSTM
 from models.hybrid import TFBS_TriBranch
 from preprocessing import one_hot_encode
-from train_comparison import _train_one, fit_shape_normalizer
 
-SEQUENCE_MODELS = {
+MODELS = {
     "cnn": ("CNN", TFBS_CNN),
     "cnn_bilstm": ("CNN + BiLSTM", TFBS_CNN_BiLSTM),
     "tri_branch": ("CNN + BiLSTM + Transformer", TFBS_TriBranch),
 }
-SHAPE_KEY = "shape"
-SHAPE_NAME = "CNN + BiLSTM + Transformer + DNA shape"
 REPORT_METRICS = ("roc_auc", "pr_auc", "accuracy", "precision", "recall", "f1")
 
 
@@ -83,29 +78,8 @@ def encode_all(sequences: np.ndarray) -> torch.Tensor:
     return torch.from_numpy(np.stack([one_hot_encode(s) for s in sequences]).astype(np.float32))
 
 
-def load_shape_features(npz_path: Path, sequences: np.ndarray) -> tuple[np.ndarray, dict]:
-    """Return DNA-shape features in the same row order as `sequences`."""
-    with np.load(npz_path, allow_pickle=False) as artifact:
-        saved_sequences = artifact["sequences"].astype(str)
-        features = artifact["features"].astype(np.float32)
-        meta = {
-            "shape_feature_names": tuple(str(x) for x in artifact["feature_names"]),
-            "shape_native_lengths": tuple(int(x) for x in artifact["native_lengths"]),
-            "shape_predictor": str(artifact["predictor"]),
-            "shape_predictor_version": str(artifact["predictor_version"]),
-        }
-    index = {s: i for i, s in enumerate(saved_sequences)}
-    missing = [s for s in sequences if s not in index]
-    if missing:
-        raise ValueError(
-            f"{len(missing)} sequences have no DNA-shape features in {npz_path}. "
-            "Run prepare_shape_dataset.py on the same CSV files first."
-        )
-    return features[[index[s] for s in sequences]], meta
-
-
-def make_loader(x, shape, y, idx, batch_size, shuffle):
-    dataset = TensorDataset(x[idx], shape[idx], torch.from_numpy(y[idx].astype(np.float32)))
+def make_loader(x: torch.Tensor, y: np.ndarray, idx: np.ndarray, batch_size: int, shuffle: bool) -> DataLoader:
+    dataset = TensorDataset(x[idx], torch.from_numpy(y[idx].astype(np.float32)))
     # drop_last on training batches: a final batch of 1 would break BatchNorm layers
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=shuffle)
 
@@ -113,13 +87,11 @@ def make_loader(x, shape, y, idx, batch_size, shuffle):
 # --------------------------------------------------------------- scoring
 
 @torch.no_grad()
-def predict_probabilities(model, loader, use_shape: bool) -> np.ndarray:
+def predict_probabilities(model: nn.Module, loader: DataLoader) -> np.ndarray:
     model.eval()
     out = []
-    for sequence, shape, _ in loader:
-        sequence = sequence.to(DEVICE)
-        logits = model(sequence, shape.to(DEVICE)) if use_shape else model(sequence)
-        out.append(torch.sigmoid(logits).squeeze(1).cpu().numpy())
+    for sequence, _ in loader:
+        out.append(torch.sigmoid(model(sequence.to(DEVICE))).squeeze(1).cpu().numpy())
     return np.concatenate(out)
 
 
@@ -141,6 +113,50 @@ def score(labels: np.ndarray, probabilities: np.ndarray, threshold: float) -> di
         "recall": float(recall_score(labels, predictions, zero_division=0)),
         "f1": float(f1_score(labels, predictions, zero_division=0)),
     }
+
+
+# -------------------------------------------------------------- training
+
+def train_one(model: nn.Module, name: str, fit_loader: DataLoader, val_loader: DataLoader,
+              val_labels: np.ndarray, fit_labels: np.ndarray, epochs: int, patience: int) -> nn.Module:
+    """Train with early stopping; keep the weights from the epoch with the best validation F1."""
+    model = model.to(DEVICE)
+    positives, negatives = int(fit_labels.sum()), int(len(fit_labels) - fit_labels.sum())
+    # Weight the loss so both classes count equally even if the data is a bit unbalanced
+    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([negatives / max(positives, 1)], device=DEVICE))
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=5e-4)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3, min_lr=1e-6)
+
+    best_f1, best_state, stale = -1.0, None, 0
+    for epoch in range(1, epochs + 1):
+        model.train()
+        total_loss, seen = 0.0, 0
+        for sequence, labels in fit_loader:
+            sequence, labels = sequence.to(DEVICE), labels.to(DEVICE).unsqueeze(1)
+            optimizer.zero_grad(set_to_none=True)
+            loss = criterion(model(sequence), labels)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item() * len(labels)
+            seen += len(labels)
+
+        val_prob = predict_probabilities(model, val_loader)
+        val_f1 = f1_score(val_labels, (val_prob >= 0.5).astype(int), zero_division=0)
+        val_auc = roc_auc_score(val_labels, val_prob)
+        scheduler.step(val_f1)
+        print(f"  {name} epoch {epoch}/{epochs}: train loss {total_loss / seen:.4f} | val F1 {val_f1:.4f} | val AUROC {val_auc:.4f}")
+
+        if val_f1 > best_f1:
+            best_f1, stale = val_f1, 0
+            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+        else:
+            stale += 1
+            if stale >= patience:
+                print(f"  {name}: stopped early after {epoch} epochs (no improvement for {patience}).")
+                break
+
+    model.load_state_dict(best_state)
+    return model
 
 
 # ------------------------------------------------------------- reporting
@@ -177,131 +193,6 @@ def save_progress(out_dir: Path, runs: dict, config: dict) -> dict:
     return summary
 
 
-# ------------------------------------------------------------------ main
-
-def run(args) -> dict:
-    out_dir = Path(args.out)
-    (out_dir / "checkpoints").mkdir(parents=True, exist_ok=True)
-    data_dir = Path(args.data_dir)
-    train_seq, train_y = load_split(data_dir / "train_clean.csv")
-    test_seq, test_y = load_split(data_dir / "test_clean.csv")
-    if set(train_seq) & set(test_seq):
-        raise ValueError("Some sequences appear in both train and test. Fix the data first.")
-
-    rng = np.random.default_rng(args.seed)
-    if args.quick:
-        train_keep = rng.choice(len(train_seq), size=min(2000, len(train_seq)), replace=False)
-        test_keep = rng.choice(len(test_seq), size=min(500, len(test_seq)), replace=False)
-        train_seq, train_y = train_seq[train_keep], train_y[train_keep]
-        test_seq, test_y = test_seq[test_keep], test_y[test_keep]
-
-    print(f"Device: {DEVICE} | train {len(train_y)} (bound {int(train_y.sum())}) | test {len(test_y)} (bound {int(test_y.sum())})")
-    x_train, x_test = encode_all(train_seq), encode_all(test_seq)
-
-    models = [m.strip() for m in args.models.split(",") if m.strip()]
-    if args.with_shape and SHAPE_KEY not in models:
-        models.append(SHAPE_KEY)
-    unknown = [m for m in models if m not in SEQUENCE_MODELS and m != SHAPE_KEY]
-    if unknown:
-        raise ValueError(f"Unknown model(s): {unknown}. Choose from {list(SEQUENCE_MODELS) + [SHAPE_KEY]}")
-
-    # Sequence-only models get a tiny placeholder instead of shape data (it is ignored).
-    shape_train = torch.zeros(len(train_y), 4, 1)
-    shape_test = torch.zeros(len(test_y), 4, 1)
-    shape_meta = {}
-    if SHAPE_KEY in models:
-        shape_dir = data_dir / "dna_shape"
-        f_train, shape_meta = load_shape_features(shape_dir / "train_shape.npz", train_seq)
-        f_test, _ = load_shape_features(shape_dir / "test_shape.npz", test_seq)
-        real_shape_train, real_shape_test = torch.from_numpy(f_train), torch.from_numpy(f_test)
-
-    config = {
-        "folds": args.folds, "epochs": args.epochs, "patience": args.patience,
-        "batch_size": args.batch_size, "seed": args.seed, "quick": args.quick,
-        "train_size": int(len(train_y)), "test_size": int(len(test_y)),
-        "sequence_length": SEQUENCE_LENGTH, "models": models,
-    }
-    results_path = out_dir / "cv_results.json"
-    runs = {}
-    if results_path.exists() and not args.restart:
-        previous = json.loads(results_path.read_text(encoding="utf-8"))
-        if previous.get("config", {}).get("quick") == args.quick:
-            runs = previous.get("runs", {})
-            print("Resuming: finished runs found in", results_path)
-
-    folds = StratifiedKFold(n_splits=args.folds, shuffle=True, random_state=args.seed)
-    splits = list(folds.split(np.zeros(len(train_y)), train_y))
-    test_idx = np.arange(len(test_y))
-
-    for key in models:
-        use_shape = key == SHAPE_KEY
-        name = SHAPE_NAME if use_shape else SEQUENCE_MODELS[key][0]
-        runs.setdefault(key, {})
-        for fold, (fit_idx, val_idx) in enumerate(splits, start=1):
-            if "test_tuned" in runs[key].get(str(fold), {}):
-                print(f"{name} fold {fold}: already done, skipping.")
-                continue
-            seed = args.seed + fold
-            random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
-            if torch.cuda.is_available():
-                torch.cuda.manual_seed_all(seed)
-
-            s_train = real_shape_train if use_shape else shape_train
-            s_test = real_shape_test if use_shape else shape_test
-            fit_loader = make_loader(x_train, s_train, train_y, fit_idx, args.batch_size, True)
-            val_loader = make_loader(x_train, s_train, train_y, val_idx, args.batch_size, False)
-            test_loader = make_loader(x_test, s_test, test_y, test_idx, args.batch_size, False)
-
-            metadata = {"sequence_length": SEQUENCE_LENGTH, "fold": fold, "random_seed": seed}
-            if use_shape:
-                from models.shape_fusion import TFBS_TriBranchShape
-
-                mean, std = fit_shape_normalizer(s_train[fit_idx].numpy())
-                model = TFBS_TriBranchShape(seq_len=SEQUENCE_LENGTH, shape_mean=torch.from_numpy(mean), shape_std=torch.from_numpy(std))
-                metadata.update(shape_meta)
-                metadata.update({
-                    "shape_mean": mean.tolist(), "shape_std": std.tolist(),
-                    "shape_positions": int(s_train.shape[2]),
-                })
-            else:
-                model = SEQUENCE_MODELS[key][1]()
-
-            print(f"\n=== {name} | fold {fold}/{args.folds} ===")
-            started = time.time()
-            # Friend's training loop: weighted loss, AdamW, LR schedule, early stopping on validation F1.
-            _train_one(
-                "tri_branch_dna_shape" if use_shape else key, name, model,
-                fit_loader, val_loader, test_loader, train_y[fit_idx],
-                use_shape, args.epochs, args.patience, metadata,
-            )
-            # _train_one leaves the best weights loaded in `model` and saves a checkpoint.
-            written = MODEL_DIR / ("best_shape_fusion.pth" if use_shape else f"comparison_{key}.pth")
-            fold_ckpt = out_dir / "checkpoints" / f"{key}_fold{fold}.pth"
-            shutil.move(str(written), fold_ckpt)  # keeps the website's model folder unchanged
-
-            val_prob = predict_probabilities(model, val_loader, use_shape)
-            test_prob = predict_probabilities(model, test_loader, use_shape)
-            threshold = best_threshold(train_y[val_idx], val_prob)
-            runs[key][str(fold)] = {
-                "model": name,
-                "fold": fold,
-                "minutes": round((time.time() - started) / 60, 2),
-                "threshold": threshold,
-                "validation": score(train_y[val_idx], val_prob, threshold),
-                "test_at_0.5": score(test_y, test_prob, 0.5),
-                "test_tuned": score(test_y, test_prob, threshold),
-                "checkpoint": str(fold_ckpt),
-            }
-            save_progress(out_dir, runs, config)
-            t = runs[key][str(fold)]["test_tuned"]
-            print(f"{name} fold {fold}: test AUROC {t['roc_auc']:.3f}, F1 {t['f1']:.3f} (cut-off {threshold})")
-
-    summary = save_progress(out_dir, runs, config)
-    export_final_models(out_dir, runs)
-    print("\n" + markdown_table(summary))
-    return summary
-
-
 def export_final_models(out_dir: Path, runs: dict) -> None:
     """For each model keep the fold with the best *validation* AUROC (never pick by test score)."""
     final_dir = out_dir / "final_models"
@@ -318,12 +209,102 @@ def export_final_models(out_dir: Path, runs: dict) -> None:
     (final_dir / "chosen_folds.json").write_text(json.dumps(chosen, indent=2), encoding="utf-8")
 
 
+# ------------------------------------------------------------------ main
+
+def run(args) -> dict:
+    out_dir = Path(args.out)
+    (out_dir / "checkpoints").mkdir(parents=True, exist_ok=True)
+    data_dir = Path(args.data_dir)
+    train_seq, train_y = load_split(data_dir / "train_clean.csv")
+    test_seq, test_y = load_split(data_dir / "test_clean.csv")
+    if set(train_seq) & set(test_seq):
+        raise ValueError("Some sequences appear in both train and test. Fix the data first.")
+
+    if args.quick:
+        rng = np.random.default_rng(args.seed)
+        keep_train = rng.choice(len(train_seq), size=min(2000, len(train_seq)), replace=False)
+        keep_test = rng.choice(len(test_seq), size=min(500, len(test_seq)), replace=False)
+        train_seq, train_y = train_seq[keep_train], train_y[keep_train]
+        test_seq, test_y = test_seq[keep_test], test_y[keep_test]
+
+    print(f"Device: {DEVICE} | train {len(train_y)} (bound {int(train_y.sum())}) | test {len(test_y)} (bound {int(test_y.sum())})")
+    x_train, x_test = encode_all(train_seq), encode_all(test_seq)
+
+    models = [m.strip() for m in args.models.split(",") if m.strip()]
+    unknown = [m for m in models if m not in MODELS]
+    if unknown:
+        raise ValueError(f"Unknown model(s): {unknown}. Choose from {list(MODELS)}")
+
+    config = {
+        "folds": args.folds, "epochs": args.epochs, "patience": args.patience,
+        "batch_size": args.batch_size, "seed": args.seed, "quick": args.quick,
+        "train_size": int(len(train_y)), "test_size": int(len(test_y)),
+        "sequence_length": SEQUENCE_LENGTH, "models": models,
+    }
+    results_path = out_dir / "cv_results.json"
+    runs = {}
+    if results_path.exists() and not args.restart:
+        previous = json.loads(results_path.read_text(encoding="utf-8"))
+        if previous.get("config", {}).get("quick") == args.quick:
+            runs = previous.get("runs", {})
+            print("Resuming: finished runs found in", results_path)
+
+    splits = list(StratifiedKFold(n_splits=args.folds, shuffle=True, random_state=args.seed)
+                  .split(np.zeros(len(train_y)), train_y))
+    test_loader = make_loader(x_test, test_y, np.arange(len(test_y)), args.batch_size, False)
+
+    for key in models:
+        name, model_class = MODELS[key]
+        runs.setdefault(key, {})
+        for fold, (fit_idx, val_idx) in enumerate(splits, start=1):
+            if "test_tuned" in runs[key].get(str(fold), {}):
+                print(f"{name} fold {fold}: already done, skipping.")
+                continue
+            seed = args.seed + fold
+            random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(seed)
+
+            fit_loader = make_loader(x_train, train_y, fit_idx, args.batch_size, True)
+            val_loader = make_loader(x_train, train_y, val_idx, args.batch_size, False)
+
+            print(f"\n=== {name} | fold {fold}/{args.folds} ===")
+            started = time.time()
+            model = train_one(model_class(), name, fit_loader, val_loader,
+                              train_y[val_idx], train_y[fit_idx], args.epochs, args.patience)
+
+            checkpoint = out_dir / "checkpoints" / f"{key}_fold{fold}.pth"
+            torch.save({"model_type": key, "model_state_dict": model.state_dict(),
+                        "sequence_length": SEQUENCE_LENGTH, "fold": fold, "random_seed": seed}, checkpoint)
+
+            val_prob = predict_probabilities(model, val_loader)
+            test_prob = predict_probabilities(model, test_loader)
+            threshold = best_threshold(train_y[val_idx], val_prob)
+            runs[key][str(fold)] = {
+                "model": name,
+                "fold": fold,
+                "minutes": round((time.time() - started) / 60, 2),
+                "threshold": threshold,
+                "validation": score(train_y[val_idx], val_prob, threshold),
+                "test_at_0.5": score(test_y, test_prob, 0.5),
+                "test_tuned": score(test_y, test_prob, threshold),
+                "checkpoint": str(checkpoint),
+            }
+            save_progress(out_dir, runs, config)
+            t = runs[key][str(fold)]["test_tuned"]
+            print(f"{name} fold {fold}: test AUROC {t['roc_auc']:.3f}, F1 {t['f1']:.3f} (cut-off {threshold})")
+
+    summary = save_progress(out_dir, runs, config)
+    export_final_models(out_dir, runs)
+    print("\n" + markdown_table(summary))
+    return summary
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data-dir", default=str(PROCESSED_DATA_DIR), help="folder with train_clean.csv and test_clean.csv")
     parser.add_argument("--out", default=str(Path(__file__).resolve().parent / "results"), help="where results and checkpoints go")
     parser.add_argument("--models", default="cnn,cnn_bilstm,tri_branch")
-    parser.add_argument("--with-shape", action="store_true", help="also train the DNA-shape model (needs DNAshapeR features)")
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--epochs", type=int, default=25)
     parser.add_argument("--patience", type=int, default=5)

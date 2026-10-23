@@ -252,27 +252,6 @@
     "advanced": "ISM evaluates all 3L single-nucleotide substitutions (303 for L = 101) and records Δp = p(mutant) − p(reference). Large negative Δp marks positions essential for binding. Unlike gradients, ISM measures the actual effect of a discrete change, which makes it the standard way to estimate variant effects."
   },
   {
-    "id": "dna_shape",
-    "title": "DNA shape features (DNAshapeR)",
-    "keywords": [
-      "shape",
-      "dna shape",
-      "dnashaper",
-      "mgw",
-      "minor groove width",
-      "roll",
-      "propeller",
-      "propeller twist",
-      "prot",
-      "helix twist",
-      "helt",
-      "shape matrix",
-      "shape model"
-    ],
-    "beginner": "Besides its letters, DNA has a physical shape. Its groove can be wider or narrower, and each step can be more or less twisted. Some proteins find their spot partly by 'feeling' that shape, like a key fitting a lock. A tool called DNAshapeR looks up 4 shape values for every position from a table built from physics simulations: groove width (MGW), propeller twist (ProT), roll and helix twist (HelT). Our shape model gets these as extra information, and we test whether that improves predictions.",
-    "advanced": "DNAshapeR predicts MGW and ProT per base pair and Roll and HelT per base-pair step from a pentamer lookup table derived from all-atom Monte Carlo simulations (Zhou et al. 2013). In TFBS_TriBranchShape, each standardised shape track plus a validity mask goes through a small CNN (64-d) and is concatenated with the 240-d tri-branch sequence representation before the classifier. Shape is a deterministic function of sequence, so any gain reflects easier learning (an inductive bias), not new information. It is evaluated against the sequence-only model on identical folds."
-  },
-  {
     "id": "major_groove",
     "title": "How proteins physically read DNA (grooves)",
     "keywords": [
