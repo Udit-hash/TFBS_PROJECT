@@ -14,8 +14,10 @@ from models.loader import load_model
 from preprocessing import clean_sequence
 
 
-def load_best():
-    for path in (MODEL_DIR / "best_hybrid.pth", MODEL_DIR / "best_cnn.pth"):
+def load_best(choice: str | None = None):
+    if choice:
+        return load_model(MODEL_DIR / "trained" / f"{choice}.pth", device=DEVICE, seq_len=SEQUENCE_LENGTH)
+    for path in (MODEL_DIR / "trained" / "tri_branch_v2.pth", MODEL_DIR / "best_hybrid.pth", MODEL_DIR / "best_cnn.pth"):
         if path.is_file():
             try:
                 return load_model(path, device=DEVICE, seq_len=SEQUENCE_LENGTH)
@@ -28,6 +30,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("sequence", nargs="?", help=f"A DNA sequence of exactly {SEQUENCE_LENGTH} bases (A/C/G/T).")
     parser.add_argument("--fasta", help="FASTA file with one or more 101 bp sequences")
+    parser.add_argument("--model", choices=["tri_branch_v2", "cnn_bilstm", "cnn", "tri_branch",
+                                            "tri_v2_no_transformer", "tri_v2_no_lstm"],
+                        help="trained model to use (default: tri_branch_v2, the proposed model)")
     args = parser.parse_args()
     if not args.sequence and not args.fasta:
         parser.error("give a sequence or --fasta")
@@ -37,7 +42,7 @@ def main():
     else:
         ids, seqs = ["input"], [clean_sequence(args.sequence)]
 
-    model, info = load_best()
+    model, info = load_best(args.model)
     print(f"Model: {info['arch']} | checkpoint: {info['path']} | cut-off {info['threshold']:.2f} | device: {DEVICE}")
     with torch.no_grad():
         probs = torch.sigmoid(model(torch.from_numpy(one_hot_batch(seqs)).to(DEVICE))).squeeze(1).cpu().numpy()

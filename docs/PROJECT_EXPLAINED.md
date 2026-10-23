@@ -30,7 +30,9 @@ Each letter becomes four switches: A = 1000, C = 0100, G = 0010, T = 0001 (**one
 | k-mer logistic regression | Counts every 5-letter word, then a simple linear classifier | The classic machine-learning baseline (like the SVM/k-mer methods in Related Work) |
 | CNN | Convolution filters slide along the DNA looking for short patterns | Shows what convolution alone achieves |
 | CNN + BiLSTM | CNN patterns, then a recurrent network reads them left→right and right→left | Shows what adding sequence context gives |
-| **CNN + BiLSTM + Transformer (ours)** | Three CNN filter sizes (8, 16, 24 bp) feed both a BiLSTM and a Transformer (self-attention). All three summaries are joined and a small classifier outputs a probability | The paper's model |
+| CNN + BiLSTM + Transformer v1 | Three CNN filter sizes (8, 16, 24 bp) in one thin layer feed both a BiLSTM and a Transformer | The original design (too shallow, see results) |
+| **CNN + BiLSTM + Transformer v2 (ours)** | Same three filter sizes, plus a second convolution layer, then the CNN summary, BiLSTM and Transformer are joined and a small classifier outputs a probability | The paper's model; the website's default |
+| v2 without Transformer / without BiLSTM | The same network with one branch switched off | Ablation: does each branch help? |
 
 ## 5. How training and testing work
 
@@ -38,6 +40,10 @@ Each letter becomes four switches: A = 1000, C = 0100, G = 0010, T = 0001 (**one
 - **5-fold cross-validation:** the training set is cut into 5 parts. Each model is trained 5 times; each time 4 parts teach the model and the 5th part (validation) tells it when to stop (early stopping) and picks the cut-off. All 5 versions are then scored on the same test set, and we report **mean ± standard deviation**. That shows the result isn't a lucky split.
 - **Cut-off:** a probability becomes "bound / not bound" by comparing it to a cut-off. Instead of always using 0.5, we choose the cut-off that gives the best F1 on the validation part. The chosen cut-off is saved inside the model file, and the website uses it.
 - **Metrics:** AUROC (main number: how well bound sequences are ranked above unbound ones; 0.5 = guessing, 1 = perfect), PR-AUC, accuracy, precision, recall, F1 and MCC (−1…1, 0 = guessing).
+
+## 5b. The results in one paragraph
+
+Test AUROC (5 folds): JASPAR scan 0.785, k-mer 0.893, CNN 0.924, **CNN + BiLSTM 0.939 (best)**, tri-branch v1 0.911, **tri-branch v2 0.934**. Removing the Transformer or the BiLSTM from v2 gives the same 0.934/0.933, so on 101 bp FOSL2 sequences the extra branches don't add accuracy. The deeper convolution stage is what mattered. The model's filters learned the real FOSL2/AP-1 site (similarity 0.97–0.99 to JASPAR) and liver co-factors (FOXA2, HNF4A). ShiftSmooth found real binding sites best among the explanation methods. Details: `docs/PAPER_CHANGES.md`.
 
 ## 6. Explaining the model (`ml/xai.py`, `ml/interpret.py`, website)
 
@@ -52,7 +58,7 @@ Each letter becomes four switches: A = 1000, C = 0100, G = 0010, T = 0001 (**one
 
 ## 7. The website
 
-- `frontend/` (React): paste a sequence, upload a FASTA file, load a real FOSL2 example, or make random DNA with an AP-1 site planted in it.
+- `frontend/` (React): paste a sequence, upload a FASTA file, load a real FOSL2 example, or make random DNA with an AP-1 site planted in it. A **Model** switch picks which trained model answers (default: our v2).
 - `ml/api.py` (FastAPI): `/predict` returns the probability, interval, cut-off, saliency, ISM and JASPAR hits; `/chat` answers questions.
 - **3D DNA helix:** your sequence drawn as a double helix, base pairs coloured by importance, with hydrogen bonds (A–T has 2, G–C has 3). It's a drawing of the model's scores on idealised DNA, not a physics simulation.
 - **Real structure tab:** a lab-measured crystal structure from the Protein Data Bank. For FOSL2 it shows c-Fos/c-Jun bound to an AP-1 site (PDB 1FOS).

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import './App.css';
 import DnaHelix3D from './components/DnaHelix3D';
 import StructureViewer from './components/StructureViewer';
 import ChatPanel from './components/ChatPanel';
-import { summarisePrediction } from './lib/api';
+import { API_BASE, summarisePrediction } from './lib/api';
 import { REAL_EXAMPLES } from './lib/examples';
 import { chip } from './components/ui';
 
@@ -38,6 +38,21 @@ export default function App() {
   const [chatOpen, setChatOpen] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState(null);
   const [exampleIndex, setExampleIndex] = useState(0);
+  const [models, setModels] = useState([]);
+  const [modelKey, setModelKey] = useState('');
+
+  // Trained models the backend can run (default: the proposed CNN + BiLSTM + Transformer v2)
+  useEffect(() => {
+    fetch(`${API_BASE}/models`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.models) {
+          setModels(d.models);
+          setModelKey(d.default);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // "Ask the tutor about this" buttons in the 3D and structure views
   const askTutor = (question) => {
@@ -130,7 +145,7 @@ export default function App() {
       const res = await fetch('/api/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sequence })
+        body: JSON.stringify(modelKey ? { sequence, model: modelKey } : { sequence })
       });
 
       if (!res.ok) {
@@ -156,7 +171,7 @@ export default function App() {
           <h1>TFBS Prediction & Interpretability Workbench</h1>
         </div>
         <div className="pipeline-tag">
-          Pipeline: <strong>{result?.model || 'CNN + BiLSTM + Transformer'}</strong>
+          Model: <strong>{result?.model || 'trained on FOSL2 (HepG2)'}</strong>
         </div>
       </header>
 
@@ -207,12 +222,28 @@ export default function App() {
               Sequence Length: {sequence.length} / 101 bp
             </span>
 
+            {models.length > 1 && (
+              <label className="model-picker">
+                <span>Model</span>
+                <select
+                  value={modelKey}
+                  onChange={(e) => { setModelKey(e.target.value); setResult(null); }}
+                >
+                  {models.map((m) => (
+                    <option key={m.key} value={m.key}>
+                      {m.name}{m.test_auroc ? ` (AUROC ${m.test_auroc.toFixed(3)})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
             <button
               className="primary-button"
               onClick={handlePredict}
               disabled={loading || sequence.length !== 101}
             >
-              {loading ? 'Executing Tri-Branch Pipeline...' : 'Run Binding Inference'}
+              {loading ? 'Running the model…' : 'Run Binding Inference'}
             </button>
           </div>
 
@@ -240,6 +271,9 @@ export default function App() {
                 <div className="verdict-text">{result.prediction_label}</div>
                 <span className={`verdict-badge ${result.prediction === 1 ? 'success' : 'neutral'}`}>
                   Cut-off: {(result.threshold ?? 0.5).toFixed(2)}{result.trained_on ? ` · trained on ${result.trained_on}` : ''}
+                </span>
+                <span className="motif-meta" style={{ display: 'block', marginTop: '8px' }}>
+                  {result.model}{result.model_test_auroc ? ` · test AUROC ${result.model_test_auroc.toFixed(3)}` : ''}
                 </span>
               </div>
 

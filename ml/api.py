@@ -7,6 +7,7 @@ import torch
 import numpy as np
 
 import os
+from pathlib import Path
 
 import chatbot  # loads ml/.env (if present) before config reads TORCH_NUM_THREADS
 import xai
@@ -31,6 +32,7 @@ app.add_middleware(
 
 class SequenceInput(BaseModel):
     sequence: str
+    model: Optional[str] = None  # key from GET /models; default = the proposed tri-branch v2
 
 
 class ChatTurn(BaseModel):
@@ -57,9 +59,16 @@ KNOWN_MOTIFS = {
 # ============================================================
 # LOAD MODEL (+ the cut-off tuned on validation data during training)
 # ============================================================
+# The website offers these trained models (ml/models/trained/, from results/run2_fosl2).
+# Default = the team's proposed CNN + BiLSTM + Transformer (v2). Change with TFBS_MODEL_KEY,
+# or point TFBS_MODEL at any other checkpoint file.
+TRAINED_DIR = MODEL_DIR / "trained"
+WEBSITE_MODELS = ["tri_branch_v2", "cnn_bilstm", "cnn", "tri_branch"]
+DEFAULT_KEY = os.environ.get("TFBS_MODEL_KEY", "tri_branch_v2")
 HYBRID_PATH = MODEL_DIR / "best_hybrid.pth"
 CNN_PATH = MODEL_DIR / "best_cnn.pth"
 TF_NAME = os.environ.get("TFBS_TF", "FOSL2")  # the factor the model was trained on
+RESULTS_JSON = MODEL_DIR.parent.parent / "results" / "run2_fosl2" / "cv_results.json"
 
 
 def _load_hybrid_checkpoint(checkpoint):
@@ -67,41 +76,77 @@ def _load_hybrid_checkpoint(checkpoint):
     return build_hybrid_from_state(checkpoint["model_state_dict"], SEQUENCE_LENGTH)
 
 
-model, MODEL_INFO, _load_errors = None, None, []
-for _path in (HYBRID_PATH, CNN_PATH):
-    if not _path.exists():
-        continue
+def _test_auroc() -> dict:
     try:
-        model, MODEL_INFO = load_model(_path, device=DEVICE, seq_len=SEQUENCE_LENGTH)
-        break
-    except RuntimeError as exc:  # incompatible file: try the next one
-        _load_errors.append(f"{_path.name}: {exc}")
-if model is None:
-    raise FileNotFoundError(f"No usable model in {MODEL_DIR}. {' '.join(_load_errors)}")
+        import json
+        summary = json.loads(RESULTS_JSON.read_text())["summary"]
+        return {k: round(v["roc_auc"]["mean"], 3) for k, v in summary.items()}
+    except (OSError, KeyError, ValueError):
+        return {}
 
+
+LOADED = {}  # key -> (network, info)
+_load_errors = []
+_custom = os.environ.get("TFBS_MODEL")
+if _custom:
+    _p = Path(_custom) if os.path.isabs(_custom) else MODEL_DIR.parent / _custom
+    LOADED["custom"] = load_model(_p, device=DEVICE, seq_len=SEQUENCE_LENGTH)
+    DEFAULT_KEY = "custom"
+for _key in WEBSITE_MODELS:
+    _p = TRAINED_DIR / f"{_key}.pth"
+    if _p.exists():
+        try:
+            LOADED[_key] = load_model(_p, device=DEVICE, seq_len=SEQUENCE_LENGTH)
+        except RuntimeError as exc:
+            _load_errors.append(f"{_p.name}: {exc}")
+if not LOADED:  # older checkouts without ml/models/trained/
+    for _p in (HYBRID_PATH, CNN_PATH):
+        if _p.exists():
+            try:
+                LOADED[_p.stem] = load_model(_p, device=DEVICE, seq_len=SEQUENCE_LENGTH)
+                break
+            except RuntimeError as exc:
+                _load_errors.append(f"{_p.name}: {exc}")
+if not LOADED:
+    raise FileNotFoundError(f"No usable model in {MODEL_DIR}. {' '.join(_load_errors)}")
+if DEFAULT_KEY not in LOADED:
+    DEFAULT_KEY = next(iter(LOADED))
+TEST_AUROC = _test_auroc()
+
+model, MODEL_INFO = LOADED[DEFAULT_KEY]
 CURRENT_ARCH = MODEL_INFO["arch"]
 THRESHOLD = MODEL_INFO["threshold"]
-print(f"Model operational: {CURRENT_ARCH} from {MODEL_INFO['path']} (cut-off {THRESHOLD:.2f})")
+for _k, (_, _info) in LOADED.items():
+    print(f"Model ready: {_k:22s} {_info['arch']} (cut-off {_info['threshold']:.2f})"
+          + (" [default]" if _k == DEFAULT_KEY else ""))
 
 
-def _forward_model(x):
-    return model(x)
+def _pick(key):
+    if key is None:
+        key = DEFAULT_KEY
+    if key not in LOADED:
+        raise HTTPException(status_code=400, detail=f"Unknown model '{key}'. Available: {list(LOADED)}")
+    return key, LOADED[key][0], LOADED[key][1]
+
+
+def _forward_model(x, net=None):
+    return (net or model)(x)
 
 
 # ============================================================
 # INTERPRETABILITY: 1. SHIFTSMOOTH SALIENCY (Section IV-C)
 # ============================================================
-def calculate_shiftsmooth_saliency(sequence: str, max_shift: int = 2):
+def calculate_shiftsmooth_saliency(sequence: str, max_shift: int = 2, net=None):
     """Gradients averaged over small shifts of the sequence (see xai.py), scaled to 0..1."""
     x = one_hot_encode(sequence)[None]
-    saliency = xai.normalise(xai.shiftsmooth(model, x, device=DEVICE, max_shift=max_shift)[0])
+    saliency = xai.normalise(xai.shiftsmooth(net or model, x, device=DEVICE, max_shift=max_shift)[0])
     return [round(float(v), 4) for v in saliency]
 
 
 # ============================================================
 # INTERPRETABILITY: 2. IN SILICO MUTAGENESIS (Section IV-C)
 # ============================================================
-def calculate_ism(sequence: str, base_prob: float):
+def calculate_ism(sequence: str, base_prob: float, net=None):
     bases = ['A', 'C', 'G', 'T']
     seq_list = list(sequence)
     mutated_matrices = []
@@ -120,7 +165,7 @@ def calculate_ism(sequence: str, base_prob: float):
 
     x_tensor = torch.tensor(np.array(mutated_matrices), dtype=torch.float32, device=DEVICE)
     with torch.no_grad():
-        probs = torch.sigmoid(_forward_model(x_tensor)).cpu().numpy()
+        probs = torch.sigmoid(_forward_model(x_tensor, net)).cpu().numpy()
 
     ism_results = []
     # Per-position impact for the 3D view: the most damaging substitution at each position
@@ -233,6 +278,19 @@ async def root():
     }
 
 
+@app.get("/models")
+async def list_models():
+    """Trained models the website can switch between, with their 5-fold test AUROC."""
+    return {
+        "default": DEFAULT_KEY,
+        "models": [
+            {"key": k, "name": info["arch"], "threshold": round(info["threshold"], 3),
+             "test_auroc": TEST_AUROC.get(k)}
+            for k, (_, info) in LOADED.items()
+        ],
+    }
+
+
 @app.post("/chat")
 def chat(data: ChatInput):
     """Beginner-friendly tutor that can explain the user's current prediction."""
@@ -251,19 +309,21 @@ async def predict_tfbs(data: SequenceInput):
     if len(seq) != SEQUENCE_LENGTH or not all(c in "ATCG" for c in seq):
         raise HTTPException(status_code=400, detail=f"Sequence must be exactly {SEQUENCE_LENGTH} bp containing A, T, C, G.")
 
+    key, net, info = _pick(data.model)
+    threshold = info["threshold"]
     encoded = one_hot_encode(seq)
     x = torch.tensor(encoded, dtype=torch.float32, device=DEVICE).unsqueeze(0)
     with torch.no_grad():
-        logits = _forward_model(x)
+        logits = _forward_model(x, net)
         probability = torch.sigmoid(logits).item()
     # 95% interval from Monte-Carlo dropout (30 extra passes with dropout switched on)
-    _, ci_low, ci_high = xai.mc_dropout_interval(model, x, device=DEVICE, passes=30)
+    _, ci_low, ci_high = xai.mc_dropout_interval(net, x, device=DEVICE, passes=30)
 
-    prediction = 1 if probability >= THRESHOLD else 0
+    prediction = 1 if probability >= threshold else 0
     prediction_label = "Potential TF Binding Site" if prediction == 1 else "Low TF Binding Potential"
 
-    saliency = calculate_shiftsmooth_saliency(seq)
-    ism, ism_position_effect = calculate_ism(seq, probability)
+    saliency = calculate_shiftsmooth_saliency(seq, net=net)
+    ism, ism_position_effect = calculate_ism(seq, probability, net=net)
     motif_logo = motif_analysis(seq, saliency)
     detected = sorted({h["name"] for h in motif_logo["known_hits"] if h["score"] >= STRONG_MATCH})
     if not _PWMS:  # no JASPAR file: fall back to exact consensus words
@@ -271,11 +331,13 @@ async def predict_tfbs(data: SequenceInput):
 
     response = {
         "status": "success",
-        "model": CURRENT_ARCH,
+        "model": info["arch"],
+        "model_key": key,
+        "model_test_auroc": TEST_AUROC.get(key),
         "input_length": len(seq),
         "binding_probability": round(probability, 4),
         "confidence_interval": [round(float(ci_low[0]), 4), round(float(ci_high[0]), 4)],
-        "threshold": round(THRESHOLD, 3),
+        "threshold": round(threshold, 3),
         "trained_on": TF_NAME,
         "prediction": prediction,
         "prediction_label": prediction_label,

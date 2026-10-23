@@ -46,7 +46,11 @@ Training happens in Google Colab, not on laptops. Open `notebooks/train_all_mode
 5. explains the trained model: filter logos + JASPAR matches + explanation-method comparison (`ml/interpret.py`);
 6. checks the website backend with the new model, and zips everything as `TFBS_results.zip`.
 
-To use the new main model in the website, copy `final_models/tri_branch.pth` into `ml/models/` as `best_hybrid.pth` (the tuned cut-off is stored inside it), and `jaspar_core_vertebrates.json` into `ml/motifs/`.
+The website uses the trained models in `ml/models/trained/`. By default it runs the team's proposed **CNN + BiLSTM + Transformer (v2)**, and a switch on the page compares it with CNN + BiLSTM (the best scorer), the CNN and the original v1 on the same sequence. Each file stores its own tuned cut-off. To start with another default:
+
+```bash
+TFBS_MODEL_KEY=cnn_bilstm uvicorn api:app --host 127.0.0.1 --port 8001
+```
 
 **More ENCODE datasets:** `ml/build_encode_dataset.py` rebuilds any of the 165 benchmark datasets listed in `ml/datasets_165.txt` from the original ENCODE peak files (UCSC, hg19). Run it in Colab, not on a laptop (it downloads the 800 MB genome).
 
@@ -84,6 +88,6 @@ notebooks/
 - The 3D helix is an idealised DNA model built from the input sequence. The colours show the model's importance scores, not measured atomic contacts.
 - The structure tab loads lab-measured protein–DNA structures from the Protein Data Bank (1FOS, 1DH3, 1CDW, 1AAY, 4AWL, 5KKQ) as reference examples. It needs internet access.
 - DNA shape features (mentioned in the paper) are left for future work; the project is Python + JavaScript only.
-- `results/run1_fosl2/` holds the first Colab run (tables, ROC curves, filter logos). `ml/motifs/jaspar_core_vertebrates.json` is JASPAR 2024 CORE vertebrates (open access, CC BY 4.0).
+- `results/run1_fosl2/` and `results/run2_fosl2/` hold the two Colab runs (tables, ROC curves, filter logos, explanation comparison); see `docs/PAPER_CHANGES.md` for what they mean for the paper. `ml/motifs/jaspar_core_vertebrates.json` is JASPAR 2024 CORE vertebrates (open access, CC BY 4.0).
 - `docs/PROJECT_EXPLAINED.md` explains every part of the project in plain language (useful for the viva).
 - Tests: `cd ml && python -m unittest discover tests`

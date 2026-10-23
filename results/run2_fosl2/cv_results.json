@@ -1,0 +1,1826 @@
+{
+  "config": {
+    "folds": 5,
+    "epochs": 30,
+    "patience": 6,
+    "batch_size": 64,
+    "seed": 42,
+    "quick": false,
+    "rc_augment": true,
+    "early_stopping": "validation AUROC",
+    "train_size": 39439,
+    "test_size": 9920,
+    "sequence_length": 101,
+    "models": [
+      "pwm",
+      "kmer_lr",
+      "cnn",
+      "cnn_bilstm",
+      "tri_branch",
+      "tri_branch_v2",
+      "tri_v2_no_transformer",
+      "tri_v2_no_lstm"
+    ],
+    "tf": "FOSL2"
+  },
+  "runs": {
+    "pwm": {
+      "1": {
+        "model": "JASPAR PWM scan (MA0478.2)",
+        "fold": 1,
+        "minutes": 0.01,
+        "threshold": 0.92,
+        "validation": {
+          "threshold": 0.92,
+          "roc_auc": 0.7881654005350822,
+          "pr_auc": 0.8409459953078531,
+          "accuracy": 0.7701572008113591,
+          "precision": 0.8873857404021938,
+          "recall": 0.6172431332655137,
+          "f1": 0.728063596820159,
+          "mcc": 0.5666650181469083
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.7846668428327506,
+          "pr_auc": 0.8336612816037363,
+          "accuracy": 0.7441532258064516,
+          "precision": 0.7844412331406551,
+          "recall": 0.6646938775510204,
+          "f1": 0.7196199734865223,
+          "mcc": 0.4929563200438156
+        },
+        "test_tuned": {
+          "threshold": 0.92,
+          "roc_auc": 0.7846668428327506,
+          "pr_auc": 0.8336612816037363,
+          "accuracy": 0.7648185483870967,
+          "precision": 0.8841664172403472,
+          "recall": 0.6028571428571429,
+          "f1": 0.7169032884358695,
+          "mcc": 0.5561908119709528
+        }
+      },
+      "2": {
+        "model": "JASPAR PWM scan (MA0478.2)",
+        "fold": 2,
+        "minutes": 0.01,
+        "threshold": 0.56,
+        "validation": {
+          "threshold": 0.56,
+          "roc_auc": 0.7846662344795806,
+          "pr_auc": 0.8399430628871934,
+          "accuracy": 0.7496196754563894,
+          "precision": 0.8078011953444479,
+          "recall": 0.6531027466937945,
+          "f1": 0.7222612853325833,
+          "mcc": 0.5083050531161901
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.7846668428327506,
+          "pr_auc": 0.8336612816037363,
+          "accuracy": 0.7441532258064516,
+          "precision": 0.7844412331406551,
+          "recall": 0.6646938775510204,
+          "f1": 0.7196199734865223,
+          "mcc": 0.4929563200438156
+        },
+        "test_tuned": {
+          "threshold": 0.56,
+          "roc_auc": 0.7846668428327506,
+          "pr_auc": 0.8336612816037363,
+          "accuracy": 0.7488911290322581,
+          "precision": 0.8064105825489697,
+          "recall": 0.6469387755102041,
+          "f1": 0.71792548975201,
+          "mcc": 0.5063247247070917
+        }
+      },
+      "3": {
+        "model": "JASPAR PWM scan (MA0478.2)",
+        "fold": 3,
+        "minutes": 0.01,
+        "threshold": 0.64,
+        "validation": {
+          "threshold": 0.64,
+          "roc_auc": 0.7770325436361523,
+          "pr_auc": 0.8319923065369723,
+          "accuracy": 0.7517748478701826,
+          "precision": 0.8244575936883629,
+          "recall": 0.6378433367243134,
+          "f1": 0.7192429022082019,
+          "mcc": 0.5165464544578449
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.7846668428327506,
+          "pr_auc": 0.8336612816037363,
+          "accuracy": 0.7441532258064516,
+          "precision": 0.7844412331406551,
+          "recall": 0.6646938775510204,
+          "f1": 0.7196199734865223,
+          "mcc": 0.4929563200438156
+        },
+        "test_tuned": {
+          "threshold": 0.64,
+          "roc_auc": 0.7846668428327506,
+          "pr_auc": 0.8336612816037363,
+          "accuracy": 0.7529233870967742,
+          "precision": 0.8219826452800421,
+          "recall": 0.6379591836734694,
+          "f1": 0.7183729748362634,
+          "mcc": 0.5173335293862563
+        }
+      },
+      "4": {
+        "model": "JASPAR PWM scan (MA0478.2)",
+        "fold": 4,
+        "minutes": 0.01,
+        "threshold": 0.26,
+        "validation": {
+          "threshold": 0.26,
+          "roc_auc": 0.7817172454990655,
+          "pr_auc": 0.8347999608801876,
+          "accuracy": 0.7289553752535497,
+          "precision": 0.7462932454695222,
+          "recall": 0.6912512716174974,
+          "f1": 0.7177185106944811,
+          "mcc": 0.4590275714705392
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.7846668428327506,
+          "pr_auc": 0.8336612816037363,
+          "accuracy": 0.7441532258064516,
+          "precision": 0.7844412331406551,
+          "recall": 0.6646938775510204,
+          "f1": 0.7196199734865223,
+          "mcc": 0.4929563200438156
+        },
+        "test_tuned": {
+          "threshold": 0.26,
+          "roc_auc": 0.7846668428327506,
+          "pr_auc": 0.8336612816037363,
+          "accuracy": 0.7272177419354838,
+          "precision": 0.7395196506550218,
+          "recall": 0.6912244897959183,
+          "f1": 0.7145569620253165,
+          "mcc": 0.4548788286482115
+        }
+      },
+      "5": {
+        "model": "JASPAR PWM scan (MA0478.2)",
+        "fold": 5,
+        "minutes": 0.01,
+        "threshold": 0.91,
+        "validation": {
+          "threshold": 0.91,
+          "roc_auc": 0.78129436192774,
+          "pr_auc": 0.8354104078061128,
+          "accuracy": 0.7658171674908076,
+          "precision": 0.888268156424581,
+          "recall": 0.6065615462868769,
+          "f1": 0.7208704851141,
+          "mcc": 0.5599876824767112
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.7846668428327506,
+          "pr_auc": 0.8336612816037363,
+          "accuracy": 0.7441532258064516,
+          "precision": 0.7844412331406551,
+          "recall": 0.6646938775510204,
+          "f1": 0.7196199734865223,
+          "mcc": 0.4929563200438156
+        },
+        "test_tuned": {
+          "threshold": 0.91,
+          "roc_auc": 0.7846668428327506,
+          "pr_auc": 0.8336612816037363,
+          "accuracy": 0.7650201612903226,
+          "precision": 0.8801420538620893,
+          "recall": 0.606938775510204,
+          "f1": 0.7184442565527237,
+          "mcc": 0.5551819203329992
+        }
+      }
+    },
+    "kmer_lr": {
+      "1": {
+        "model": "k-mer logistic regression",
+        "fold": 1,
+        "minutes": 0.08,
+        "threshold": 0.4,
+        "validation": {
+          "threshold": 0.4,
+          "roc_auc": 0.8982922009860242,
+          "pr_auc": 0.9072315276412091,
+          "accuracy": 0.809077079107505,
+          "precision": 0.7803975959315765,
+          "recall": 0.8585961342828077,
+          "f1": 0.8176313877452167,
+          "mcc": 0.6213731583789185
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.8928880396780227,
+          "pr_auc": 0.8983904814260704,
+          "accuracy": 0.8108870967741936,
+          "precision": 0.812525837122778,
+          "recall": 0.8022448979591836,
+          "f1": 0.8073526391456152,
+          "mcc": 0.6217102240610084
+        },
+        "test_tuned": {
+          "threshold": 0.4,
+          "roc_auc": 0.8928880396780227,
+          "pr_auc": 0.8983904814260704,
+          "accuracy": 0.8045362903225807,
+          "precision": 0.7750325097529259,
+          "recall": 0.8514285714285714,
+          "f1": 0.8114363512593601,
+          "mcc": 0.61237986743481
+        }
+      },
+      "2": {
+        "model": "k-mer logistic regression",
+        "fold": 2,
+        "minutes": 0.08,
+        "threshold": 0.47,
+        "validation": {
+          "threshold": 0.47,
+          "roc_auc": 0.8957331511324467,
+          "pr_auc": 0.9043617946323036,
+          "accuracy": 0.8152890466531441,
+          "precision": 0.8088345395557774,
+          "recall": 0.8242624618514751,
+          "f1": 0.8164756266532309,
+          "mcc": 0.6307100837594785
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.8929999593462883,
+          "pr_auc": 0.8981520978998145,
+          "accuracy": 0.8126008064516129,
+          "precision": 0.8155218925088192,
+          "recall": 0.8020408163265306,
+          "f1": 0.8087251774873958,
+          "mcc": 0.6251561072308416
+        },
+        "test_tuned": {
+          "threshold": 0.47,
+          "roc_auc": 0.8929999593462883,
+          "pr_auc": 0.8981520978998145,
+          "accuracy": 0.8118951612903226,
+          "precision": 0.8031574740207834,
+          "recall": 0.820204081632653,
+          "f1": 0.8115912762520194,
+          "mcc": 0.6239678375290091
+        }
+      },
+      "3": {
+        "model": "k-mer logistic regression",
+        "fold": 3,
+        "minutes": 0.08,
+        "threshold": 0.41,
+        "validation": {
+          "threshold": 0.41,
+          "roc_auc": 0.8913066621956476,
+          "pr_auc": 0.8964300040978609,
+          "accuracy": 0.8127535496957403,
+          "precision": 0.7902577441475526,
+          "recall": 0.8499491353001017,
+          "f1": 0.8190172772944492,
+          "mcc": 0.6273699866510147
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.8936495650052849,
+          "pr_auc": 0.8988251829720852,
+          "accuracy": 0.8152217741935484,
+          "precision": 0.8180875337066998,
+          "recall": 0.8048979591836735,
+          "f1": 0.8114391523505812,
+          "mcc": 0.630398245280329
+        },
+        "test_tuned": {
+          "threshold": 0.41,
+          "roc_auc": 0.8936495650052849,
+          "pr_auc": 0.8988251829720852,
+          "accuracy": 0.807258064516129,
+          "precision": 0.7817804602036967,
+          "recall": 0.8459183673469388,
+          "f1": 0.8125857674965693,
+          "mcc": 0.6168633803070832
+        }
+      },
+      "4": {
+        "model": "k-mer logistic regression",
+        "fold": 4,
+        "minutes": 0.08,
+        "threshold": 0.48,
+        "validation": {
+          "threshold": 0.48,
+          "roc_auc": 0.9001231887486665,
+          "pr_auc": 0.9087148624127853,
+          "accuracy": 0.8234026369168357,
+          "precision": 0.8259306803594352,
+          "recall": 0.8181586978636826,
+          "f1": 0.8220263191516546,
+          "mcc": 0.6468203881614388
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.8930187007073745,
+          "pr_auc": 0.8982202114432886,
+          "accuracy": 0.8115927419354839,
+          "precision": 0.814614905542869,
+          "recall": 0.8008163265306123,
+          "f1": 0.8076566841617784,
+          "mcc": 0.6231413348017204
+        },
+        "test_tuned": {
+          "threshold": 0.48,
+          "roc_auc": 0.8930187007073745,
+          "pr_auc": 0.8982202114432886,
+          "accuracy": 0.8106854838709677,
+          "precision": 0.8064908722109534,
+          "recall": 0.8114285714285714,
+          "f1": 0.8089521871820956,
+          "mcc": 0.6213546302246706
+        }
+      },
+      "5": {
+        "model": "k-mer logistic regression",
+        "fold": 5,
+        "minutes": 0.08,
+        "threshold": 0.41,
+        "validation": {
+          "threshold": 0.41,
+          "roc_auc": 0.8985541821586438,
+          "pr_auc": 0.9054468204859091,
+          "accuracy": 0.8131101813110181,
+          "precision": 0.7908187411263606,
+          "recall": 0.8499491353001017,
+          "f1": 0.8193184604069625,
+          "mcc": 0.6280455208719933
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.8928444182453856,
+          "pr_auc": 0.8978748375693755,
+          "accuracy": 0.8123991935483871,
+          "precision": 0.8157074589653023,
+          "recall": 0.8012244897959183,
+          "f1": 0.8084011119118707,
+          "mcc": 0.6247600081938259
+        },
+        "test_tuned": {
+          "threshold": 0.41,
+          "roc_auc": 0.8928444182453856,
+          "pr_auc": 0.8978748375693755,
+          "accuracy": 0.8051411290322581,
+          "precision": 0.7802758360098243,
+          "recall": 0.8428571428571429,
+          "f1": 0.8103600510154028,
+          "mcc": 0.6125211113377503
+        }
+      }
+    },
+    "cnn": {
+      "1": {
+        "model": "CNN (Baseline)",
+        "fold": 1,
+        "minutes": 0.64,
+        "best_epoch": 10,
+        "threshold": 0.5,
+        "validation": {
+          "threshold": 0.5,
+          "roc_auc": 0.9253578208204799,
+          "pr_auc": 0.9350572129719751,
+          "accuracy": 0.845841784989858,
+          "precision": 0.8509043927648579,
+          "recall": 0.8374872838250255,
+          "f1": 0.8441425275570367,
+          "mcc": 0.6917514562174423
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9225082730303277,
+          "pr_auc": 0.9303677631602187,
+          "accuracy": 0.8455645161290323,
+          "precision": 0.8445171849427169,
+          "recall": 0.8424489795918367,
+          "f1": 0.8434818144666939,
+          "mcc": 0.6910768087504778
+        },
+        "test_tuned": {
+          "threshold": 0.5,
+          "roc_auc": 0.9225082730303277,
+          "pr_auc": 0.9303677631602187,
+          "accuracy": 0.8455645161290323,
+          "precision": 0.8445171849427169,
+          "recall": 0.8424489795918367,
+          "f1": 0.8434818144666939,
+          "mcc": 0.6910768087504778
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/cnn_fold1.pth"
+      },
+      "2": {
+        "model": "CNN (Baseline)",
+        "fold": 2,
+        "minutes": 0.65,
+        "best_epoch": 11,
+        "threshold": 0.47,
+        "validation": {
+          "threshold": 0.47,
+          "roc_auc": 0.9263088338457519,
+          "pr_auc": 0.9365383822559368,
+          "accuracy": 0.8459685598377282,
+          "precision": 0.8338658146964856,
+          "recall": 0.8629196337741607,
+          "f1": 0.8481439820022497,
+          "mcc": 0.6923845886291415
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9251659891048051,
+          "pr_auc": 0.9325045054190857,
+          "accuracy": 0.84375,
+          "precision": 0.8299842395587076,
+          "recall": 0.8597959183673469,
+          "f1": 0.8446271050521251,
+          "mcc": 0.6880214208173726
+        },
+        "test_tuned": {
+          "threshold": 0.47,
+          "roc_auc": 0.9251659891048051,
+          "pr_auc": 0.9325045054190857,
+          "accuracy": 0.8408266129032258,
+          "precision": 0.8227405247813411,
+          "recall": 0.8638775510204082,
+          "f1": 0.8428073668491787,
+          "mcc": 0.6826293201465853
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/cnn_fold2.pth"
+      },
+      "3": {
+        "model": "CNN (Baseline)",
+        "fold": 3,
+        "minutes": 0.43,
+        "best_epoch": 5,
+        "threshold": 0.56,
+        "validation": {
+          "threshold": 0.56,
+          "roc_auc": 0.9244203404283333,
+          "pr_auc": 0.9343153768036812,
+          "accuracy": 0.8488843813387424,
+          "precision": 0.8647497337593184,
+          "recall": 0.8260427263479145,
+          "f1": 0.8449531737773153,
+          "mcc": 0.6984208779703074
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.921014797951053,
+          "pr_auc": 0.9288687388422294,
+          "accuracy": 0.8413306451612903,
+          "precision": 0.8302223987291502,
+          "recall": 0.853265306122449,
+          "f1": 0.84158615136876,
+          "mcc": 0.6829767906001523
+        },
+        "test_tuned": {
+          "threshold": 0.56,
+          "roc_auc": 0.921014797951053,
+          "pr_auc": 0.9288687388422294,
+          "accuracy": 0.8445564516129033,
+          "precision": 0.8483402489626556,
+          "recall": 0.8344897959183674,
+          "f1": 0.841358024691358,
+          "mcc": 0.6890964171106198
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/cnn_fold3.pth"
+      },
+      "4": {
+        "model": "CNN (Baseline)",
+        "fold": 4,
+        "minutes": 0.47,
+        "best_epoch": 6,
+        "threshold": 0.17,
+        "validation": {
+          "threshold": 0.17,
+          "roc_auc": 0.928216742252262,
+          "pr_auc": 0.9370247152299502,
+          "accuracy": 0.847870182555781,
+          "precision": 0.8490035769034237,
+          "recall": 0.845116988809766,
+          "f1": 0.8470558246240122,
+          "mcc": 0.6957405695310421
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9277219895926497,
+          "pr_auc": 0.9350533868924382,
+          "accuracy": 0.8411290322580646,
+          "precision": 0.934850863422292,
+          "recall": 0.7291836734693877,
+          "f1": 0.819307498280211,
+          "mcc": 0.6981564674110468
+        },
+        "test_tuned": {
+          "threshold": 0.17,
+          "roc_auc": 0.9277219895926497,
+          "pr_auc": 0.9350533868924382,
+          "accuracy": 0.8483870967741935,
+          "precision": 0.8442822384428224,
+          "recall": 0.8497959183673469,
+          "f1": 0.8470301057770545,
+          "mcc": 0.6967679884034702
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/cnn_fold4.pth"
+      },
+      "5": {
+        "model": "CNN (Baseline)",
+        "fold": 5,
+        "minutes": 0.43,
+        "best_epoch": 5,
+        "threshold": 0.34,
+        "validation": {
+          "threshold": 0.34,
+          "roc_auc": 0.9270846810442505,
+          "pr_auc": 0.9369886033421397,
+          "accuracy": 0.8521617852161785,
+          "precision": 0.8654862579281184,
+          "recall": 0.832909460834181,
+          "f1": 0.8488854328667703,
+          "mcc": 0.7047853319971851
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9247912838442149,
+          "pr_auc": 0.9324110358243034,
+          "accuracy": 0.8480846774193549,
+          "precision": 0.902491103202847,
+          "recall": 0.7763265306122449,
+          "f1": 0.8346681294569391,
+          "mcc": 0.7023713389725473
+        },
+        "test_tuned": {
+          "threshold": 0.34,
+          "roc_auc": 0.9247912838442149,
+          "pr_auc": 0.9324110358243034,
+          "accuracy": 0.8462701612903226,
+          "precision": 0.8507586780295157,
+          "recall": 0.8353061224489796,
+          "f1": 0.8429615899495417,
+          "mcc": 0.6925401328413243
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/cnn_fold5.pth"
+      }
+    },
+    "cnn_bilstm": {
+      "1": {
+        "model": "CNN + BiLSTM",
+        "fold": 1,
+        "minutes": 0.99,
+        "best_epoch": 16,
+        "threshold": 0.65,
+        "validation": {
+          "threshold": 0.65,
+          "roc_auc": 0.9430167177199448,
+          "pr_auc": 0.9499707181471806,
+          "accuracy": 0.8718306288032455,
+          "precision": 0.8707793856308708,
+          "recall": 0.8723296032553408,
+          "f1": 0.8715538051073561,
+          "mcc": 0.7436614401491778
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9413686072038377,
+          "pr_auc": 0.9466552439038478,
+          "accuracy": 0.859375,
+          "precision": 0.8310976761760817,
+          "recall": 0.8977551020408163,
+          "f1": 0.863141371529481,
+          "mcc": 0.7212420909360289
+        },
+        "test_tuned": {
+          "threshold": 0.65,
+          "roc_auc": 0.9413686072038377,
+          "pr_auc": 0.9466552439038478,
+          "accuracy": 0.8690524193548387,
+          "precision": 0.8663275686673448,
+          "recall": 0.8689795918367347,
+          "f1": 0.8676515537442689,
+          "mcc": 0.7380794687260015
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/cnn_bilstm_fold1.pth"
+      },
+      "2": {
+        "model": "CNN + BiLSTM",
+        "fold": 2,
+        "minutes": 0.91,
+        "best_epoch": 14,
+        "threshold": 0.63,
+        "validation": {
+          "threshold": 0.63,
+          "roc_auc": 0.9411122487237539,
+          "pr_auc": 0.9483604569964714,
+          "accuracy": 0.871577079107505,
+          "precision": 0.8843824071635502,
+          "recall": 0.8540183112919634,
+          "f1": 0.8689351791952387,
+          "mcc": 0.7435608466893653
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9386168387673794,
+          "pr_auc": 0.944490184659228,
+          "accuracy": 0.8600806451612903,
+          "precision": 0.8420335021425789,
+          "recall": 0.8822448979591837,
+          "f1": 0.8616703209089097,
+          "mcc": 0.7210822182134352
+        },
+        "test_tuned": {
+          "threshold": 0.63,
+          "roc_auc": 0.9386168387673794,
+          "pr_auc": 0.944490184659228,
+          "accuracy": 0.8649193548387096,
+          "precision": 0.8720735785953178,
+          "recall": 0.8514285714285714,
+          "f1": 0.8616274266831888,
+          "mcc": 0.7299225124312536
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/cnn_bilstm_fold2.pth"
+      },
+      "3": {
+        "model": "CNN + BiLSTM",
+        "fold": 3,
+        "minutes": 0.93,
+        "best_epoch": 14,
+        "threshold": 0.4,
+        "validation": {
+          "threshold": 0.4,
+          "roc_auc": 0.937848087610717,
+          "pr_auc": 0.9437691304563914,
+          "accuracy": 0.861815415821501,
+          "precision": 0.8599290780141844,
+          "recall": 0.8634282807731435,
+          "f1": 0.8616751269035533,
+          "mcc": 0.7236376391120208
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9370174404423126,
+          "pr_auc": 0.9433310020395825,
+          "accuracy": 0.8640120967741935,
+          "precision": 0.8684374351525213,
+          "recall": 0.8540816326530613,
+          "f1": 0.8611997119045169,
+          "mcc": 0.7280277864535534
+        },
+        "test_tuned": {
+          "threshold": 0.4,
+          "roc_auc": 0.9370174404423126,
+          "pr_auc": 0.9433310020395825,
+          "accuracy": 0.8614919354838709,
+          "precision": 0.8466378293354306,
+          "recall": 0.8787755102040816,
+          "f1": 0.8624073703184458,
+          "mcc": 0.7235776027966094
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/cnn_bilstm_fold3.pth"
+      },
+      "4": {
+        "model": "CNN + BiLSTM",
+        "fold": 4,
+        "minutes": 0.92,
+        "best_epoch": 14,
+        "threshold": 0.23,
+        "validation": {
+          "threshold": 0.23,
+          "roc_auc": 0.94184455382555,
+          "pr_auc": 0.9473337231817771,
+          "accuracy": 0.8663793103448276,
+          "precision": 0.853910477127398,
+          "recall": 0.8830111902339777,
+          "f1": 0.8682170542635659,
+          "mcc": 0.7332069998074072
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9375314253191316,
+          "pr_auc": 0.9431718038210612,
+          "accuracy": 0.8664314516129032,
+          "precision": 0.9136773894931729,
+          "recall": 0.8057142857142857,
+          "f1": 0.8563062574558074,
+          "mcc": 0.7375038881988337
+        },
+        "test_tuned": {
+          "threshold": 0.23,
+          "roc_auc": 0.9375314253191316,
+          "pr_auc": 0.9431718038210612,
+          "accuracy": 0.8594758064516129,
+          "precision": 0.8448072383949646,
+          "recall": 0.8765306122448979,
+          "f1": 0.8603766025641025,
+          "mcc": 0.7195315517096331
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/cnn_bilstm_fold4.pth"
+      },
+      "5": {
+        "model": "CNN + BiLSTM",
+        "fold": 5,
+        "minutes": 1.37,
+        "best_epoch": 24,
+        "threshold": 0.65,
+        "validation": {
+          "threshold": 0.65,
+          "roc_auc": 0.9432549292459806,
+          "pr_auc": 0.948974796234581,
+          "accuracy": 0.8709268416381387,
+          "precision": 0.8751287332646756,
+          "recall": 0.8644455747711088,
+          "f1": 0.8697543500511771,
+          "mcc": 0.7418972894613296
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9390565696398081,
+          "pr_auc": 0.9447904550690428,
+          "accuracy": 0.8597782258064516,
+          "precision": 0.8394273553878894,
+          "recall": 0.8855102040816326,
+          "f1": 0.8618532128314629,
+          "mcc": 0.7207590153634547
+        },
+        "test_tuned": {
+          "threshold": 0.65,
+          "roc_auc": 0.9390565696398081,
+          "pr_auc": 0.9447904550690428,
+          "accuracy": 0.8658266129032258,
+          "precision": 0.8656013112067199,
+          "recall": 0.8622448979591837,
+          "f1": 0.863919844596667,
+          "mcc": 0.7316068831946492
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/cnn_bilstm_fold5.pth"
+      }
+    },
+    "tri_branch": {
+      "1": {
+        "model": "CNN + BiLSTM + Transformer",
+        "fold": 1,
+        "minutes": 1.69,
+        "best_epoch": 16,
+        "threshold": 0.23,
+        "validation": {
+          "threshold": 0.23,
+          "roc_auc": 0.9116444418614937,
+          "pr_auc": 0.9204254881841618,
+          "accuracy": 0.8250507099391481,
+          "precision": 0.8124387855044074,
+          "recall": 0.8438453713123093,
+          "f1": 0.8278443113772455,
+          "mcc": 0.6506224648470517
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.912457557525002,
+          "pr_auc": 0.9198805245704627,
+          "accuracy": 0.7842741935483871,
+          "precision": 0.946313065976714,
+          "recall": 0.5971428571428572,
+          "f1": 0.7322322322322322,
+          "mcc": 0.6088640755777451
+        },
+        "test_tuned": {
+          "threshold": 0.23,
+          "roc_auc": 0.912457557525002,
+          "pr_auc": 0.9198805245704627,
+          "accuracy": 0.8256048387096774,
+          "precision": 0.8080062184220754,
+          "recall": 0.8485714285714285,
+          "f1": 0.8277921560820227,
+          "mcc": 0.6521697094166539
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_branch_fold1.pth"
+      },
+      "2": {
+        "model": "CNN + BiLSTM + Transformer",
+        "fold": 2,
+        "minutes": 1.95,
+        "best_epoch": 19,
+        "threshold": 0.49,
+        "validation": {
+          "threshold": 0.49,
+          "roc_auc": 0.9250191835521355,
+          "pr_auc": 0.9322008154566102,
+          "accuracy": 0.8445740365111561,
+          "precision": 0.8385885885885885,
+          "recall": 0.852238046795524,
+          "f1": 0.8453582240161454,
+          "mcc": 0.6892512884578449
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9232746564761362,
+          "pr_auc": 0.9300257272850898,
+          "accuracy": 0.8414314516129032,
+          "precision": 0.8305185773892311,
+          "recall": 0.8530612244897959,
+          "f1": 0.8416389811738649,
+          "mcc": 0.6831649161089776
+        },
+        "test_tuned": {
+          "threshold": 0.49,
+          "roc_auc": 0.9232746564761362,
+          "pr_auc": 0.9300257272850898,
+          "accuracy": 0.8405241935483871,
+          "precision": 0.8264462809917356,
+          "recall": 0.8571428571428571,
+          "f1": 0.8415147265077139,
+          "mcc": 0.6816020017734887
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_branch_fold2.pth"
+      },
+      "3": {
+        "model": "CNN + BiLSTM + Transformer",
+        "fold": 3,
+        "minutes": 1.09,
+        "best_epoch": 8,
+        "threshold": 0.68,
+        "validation": {
+          "threshold": 0.68,
+          "roc_auc": 0.9097546948272298,
+          "pr_auc": 0.919657079703418,
+          "accuracy": 0.8266987829614605,
+          "precision": 0.8208656492369277,
+          "recall": 0.8344354018311292,
+          "f1": 0.8275949047799218,
+          "mcc": 0.6535004856767481
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9068115293926337,
+          "pr_auc": 0.9153376808685892,
+          "accuracy": 0.7584677419354838,
+          "precision": 0.6863649895802322,
+          "recall": 0.9410204081632653,
+          "f1": 0.7937682905835772,
+          "mcc": 0.5574505787136608
+        },
+        "test_tuned": {
+          "threshold": 0.68,
+          "roc_auc": 0.9068115293926337,
+          "pr_auc": 0.9153376808685892,
+          "accuracy": 0.8212701612903226,
+          "precision": 0.8164339202590569,
+          "recall": 0.823265306122449,
+          "f1": 0.8198353825830709,
+          "mcc": 0.6425457123128959
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_branch_fold3.pth"
+      },
+      "4": {
+        "model": "CNN + BiLSTM + Transformer",
+        "fold": 4,
+        "minutes": 0.86,
+        "best_epoch": 5,
+        "threshold": 0.38,
+        "validation": {
+          "threshold": 0.38,
+          "roc_auc": 0.9099888318811094,
+          "pr_auc": 0.9207571920429007,
+          "accuracy": 0.8308823529411765,
+          "precision": 0.8363542206110823,
+          "recall": 0.8214649033570702,
+          "f1": 0.8288426995124455,
+          "mcc": 0.6618475733604858
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9060977721765997,
+          "pr_auc": 0.914694977679835,
+          "accuracy": 0.813508064516129,
+          "precision": 0.8971354166666666,
+          "recall": 0.7030612244897959,
+          "f1": 0.7883295194508009,
+          "mcc": 0.6408828852504632
+        },
+        "test_tuned": {
+          "threshold": 0.38,
+          "roc_auc": 0.9060977721765997,
+          "pr_auc": 0.914694977679835,
+          "accuracy": 0.822883064516129,
+          "precision": 0.8251603558866129,
+          "recall": 0.8138775510204082,
+          "f1": 0.8194801191821638,
+          "mcc": 0.6457153264039629
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_branch_fold4.pth"
+      },
+      "5": {
+        "model": "CNN + BiLSTM + Transformer",
+        "fold": 5,
+        "minutes": 0.92,
+        "best_epoch": 6,
+        "threshold": 0.4,
+        "validation": {
+          "threshold": 0.4,
+          "roc_auc": 0.9066549161279038,
+          "pr_auc": 0.9181039593935844,
+          "accuracy": 0.8203372638519082,
+          "precision": 0.8108776266996292,
+          "recall": 0.8341810783316378,
+          "f1": 0.8223642973548954,
+          "mcc": 0.6409646569642704
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9046073054719896,
+          "pr_auc": 0.9149313038358203,
+          "accuracy": 0.8212701612903226,
+          "precision": 0.8773835384986725,
+          "recall": 0.7418367346938776,
+          "f1": 0.8039367466548711,
+          "mcc": 0.6494658604164091
+        },
+        "test_tuned": {
+          "threshold": 0.4,
+          "roc_auc": 0.9046073054719896,
+          "pr_auc": 0.9149313038358203,
+          "accuracy": 0.8149193548387097,
+          "precision": 0.8019314150571542,
+          "recall": 0.8304081632653061,
+          "f1": 0.8159213956286344,
+          "mcc": 0.6303293588979569
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_branch_fold5.pth"
+      }
+    },
+    "tri_branch_v2": {
+      "1": {
+        "model": "CNN + BiLSTM + Transformer (v2)",
+        "fold": 1,
+        "minutes": 1.68,
+        "best_epoch": 15,
+        "threshold": 0.23,
+        "validation": {
+          "threshold": 0.23,
+          "roc_auc": 0.9370350045824517,
+          "pr_auc": 0.9459696378303859,
+          "accuracy": 0.8680273833671399,
+          "precision": 0.8779084967320261,
+          "recall": 0.8540183112919634,
+          "f1": 0.8657986334923296,
+          "mcc": 0.736301602266255
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9364081429384502,
+          "pr_auc": 0.9427956159588378,
+          "accuracy": 0.8483870967741935,
+          "precision": 0.9440376569037657,
+          "recall": 0.736734693877551,
+          "f1": 0.8276020174232004,
+          "mcc": 0.7130069826222577
+        },
+        "test_tuned": {
+          "threshold": 0.23,
+          "roc_auc": 0.9364081429384502,
+          "pr_auc": 0.9427956159588378,
+          "accuracy": 0.8605846774193548,
+          "precision": 0.8656685381576211,
+          "recall": 0.8495918367346939,
+          "f1": 0.8575548460191574,
+          "mcc": 0.7211881095264717
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_branch_v2_fold1.pth"
+      },
+      "2": {
+        "model": "CNN + BiLSTM + Transformer (v2)",
+        "fold": 2,
+        "minutes": 1.49,
+        "best_epoch": 13,
+        "threshold": 0.41,
+        "validation": {
+          "threshold": 0.41,
+          "roc_auc": 0.9325863362706969,
+          "pr_auc": 0.9412721805739863,
+          "accuracy": 0.8578853955375254,
+          "precision": 0.8678356451190787,
+          "recall": 0.8433367243133265,
+          "f1": 0.8554108087192055,
+          "mcc": 0.7160275060748472
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9333025042686397,
+          "pr_auc": 0.939668868700723,
+          "accuracy": 0.8544354838709678,
+          "precision": 0.888314606741573,
+          "recall": 0.806734693877551,
+          "f1": 0.8455614973262032,
+          "mcc": 0.7114498150821376
+        },
+        "test_tuned": {
+          "threshold": 0.41,
+          "roc_auc": 0.9333025042686397,
+          "pr_auc": 0.939668868700723,
+          "accuracy": 0.8572580645161291,
+          "precision": 0.8594717292612464,
+          "recall": 0.85,
+          "f1": 0.8547096244613175,
+          "mcc": 0.7144791016921535
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_branch_v2_fold2.pth"
+      },
+      "3": {
+        "model": "CNN + BiLSTM + Transformer (v2)",
+        "fold": 3,
+        "minutes": 1.85,
+        "best_epoch": 18,
+        "threshold": 0.25,
+        "validation": {
+          "threshold": 0.25,
+          "roc_auc": 0.9382469627756799,
+          "pr_auc": 0.9461925745228975,
+          "accuracy": 0.8592799188640974,
+          "precision": 0.841812015503876,
+          "recall": 0.8837741607324516,
+          "f1": 0.8622828784119106,
+          "mcc": 0.7194885266904244
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9349324335311815,
+          "pr_auc": 0.941450828668239,
+          "accuracy": 0.8569556451612903,
+          "precision": 0.9107859334434741,
+          "recall": 0.7875510204081633,
+          "f1": 0.8446973842617927,
+          "mcc": 0.7198891821959198
+        },
+        "test_tuned": {
+          "threshold": 0.25,
+          "roc_auc": 0.9349324335311815,
+          "pr_auc": 0.941450828668239,
+          "accuracy": 0.8495967741935484,
+          "precision": 0.8224829674489024,
+          "recall": 0.8869387755102041,
+          "f1": 0.8534956794972506,
+          "mcc": 0.7015332967391228
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_branch_v2_fold3.pth"
+      },
+      "4": {
+        "model": "CNN + BiLSTM + Transformer (v2)",
+        "fold": 4,
+        "minutes": 1.57,
+        "best_epoch": 14,
+        "threshold": 0.28,
+        "validation": {
+          "threshold": 0.28,
+          "roc_auc": 0.9353617796781895,
+          "pr_auc": 0.9429860376411763,
+          "accuracy": 0.8599137931034483,
+          "precision": 0.8539944903581267,
+          "recall": 0.8672431332655137,
+          "f1": 0.8605678233438486,
+          "mcc": 0.7199242830871454
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9330085779331654,
+          "pr_auc": 0.9401286169371483,
+          "accuracy": 0.8465725806451613,
+          "precision": 0.9233082706766917,
+          "recall": 0.7518367346938776,
+          "f1": 0.8287964004499437,
+          "mcc": 0.7044320000996805
+        },
+        "test_tuned": {
+          "threshold": 0.28,
+          "roc_auc": 0.9330085779331654,
+          "pr_auc": 0.9401286169371483,
+          "accuracy": 0.8539314516129032,
+          "precision": 0.8471132568899618,
+          "recall": 0.8593877551020408,
+          "f1": 0.8532063620707122,
+          "mcc": 0.7079432708439795
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_branch_v2_fold4.pth"
+      },
+      "5": {
+        "model": "CNN + BiLSTM + Transformer (v2)",
+        "fold": 5,
+        "minutes": 1.58,
+        "best_epoch": 14,
+        "threshold": 0.38,
+        "validation": {
+          "threshold": 0.38,
+          "roc_auc": 0.9354120555126147,
+          "pr_auc": 0.9450529489779774,
+          "accuracy": 0.8647140864714087,
+          "precision": 0.8683466186680381,
+          "recall": 0.8588504577822991,
+          "f1": 0.8635724331926864,
+          "mcc": 0.7294606381735643
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9312901455402879,
+          "pr_auc": 0.9380326391502203,
+          "accuracy": 0.853125,
+          "precision": 0.895292766934558,
+          "recall": 0.7957142857142857,
+          "f1": 0.8425715829281469,
+          "mcc": 0.7101285347253535
+        },
+        "test_tuned": {
+          "threshold": 0.38,
+          "roc_auc": 0.9312901455402879,
+          "pr_auc": 0.9380326391502203,
+          "accuracy": 0.8525201612903226,
+          "precision": 0.8479449281231018,
+          "recall": 0.8546938775510204,
+          "f1": 0.8513060270352678,
+          "mcc": 0.7050470125211671
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_branch_v2_fold5.pth"
+      }
+    },
+    "tri_v2_no_transformer": {
+      "1": {
+        "model": "v2 without Transformer (CNN + BiLSTM)",
+        "fold": 1,
+        "minutes": 1.39,
+        "best_epoch": 20,
+        "threshold": 0.32,
+        "validation": {
+          "threshold": 0.32,
+          "roc_auc": 0.9379437803632429,
+          "pr_auc": 0.944990647215139,
+          "accuracy": 0.8672667342799188,
+          "precision": 0.8864184302169836,
+          "recall": 0.8415564598168871,
+          "f1": 0.8634050880626223,
+          "mcc": 0.7354272945704969
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9336805024798764,
+          "pr_auc": 0.9399050928794922,
+          "accuracy": 0.8545362903225806,
+          "precision": 0.9247972474809536,
+          "recall": 0.7679591836734694,
+          "f1": 0.8391124986063107,
+          "mcc": 0.7186414556719576
+        },
+        "test_tuned": {
+          "threshold": 0.32,
+          "roc_auc": 0.9336805024798764,
+          "pr_auc": 0.9399050928794922,
+          "accuracy": 0.8563508064516129,
+          "precision": 0.871022848601324,
+          "recall": 0.8324489795918367,
+          "f1": 0.8512991756235,
+          "mcc": 0.7131911899336896
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_v2_no_transformer_fold1.pth"
+      },
+      "2": {
+        "model": "v2 without Transformer (CNN + BiLSTM)",
+        "fold": 2,
+        "minutes": 1.25,
+        "best_epoch": 17,
+        "threshold": 0.42,
+        "validation": {
+          "threshold": 0.42,
+          "roc_auc": 0.9370823848704004,
+          "pr_auc": 0.9445412302557503,
+          "accuracy": 0.8663793103448276,
+          "precision": 0.8757180156657963,
+          "recall": 0.853001017293998,
+          "f1": 0.8642102550888946,
+          "mcc": 0.7329803258586712
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9340097975445157,
+          "pr_auc": 0.9398045983546606,
+          "accuracy": 0.8569556451612903,
+          "precision": 0.891739815440018,
+          "recall": 0.8085714285714286,
+          "f1": 0.8481215883549181,
+          "mcc": 0.7166060304306133
+        },
+        "test_tuned": {
+          "threshold": 0.42,
+          "roc_auc": 0.9340097975445157,
+          "pr_auc": 0.9398045983546606,
+          "accuracy": 0.8570564516129032,
+          "precision": 0.8657563025210084,
+          "recall": 0.8410204081632653,
+          "f1": 0.8532091097308488,
+          "mcc": 0.7142582450919337
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_v2_no_transformer_fold2.pth"
+      },
+      "3": {
+        "model": "v2 without Transformer (CNN + BiLSTM)",
+        "fold": 3,
+        "minutes": 1.34,
+        "best_epoch": 18,
+        "threshold": 0.36,
+        "validation": {
+          "threshold": 0.36,
+          "roc_auc": 0.936140018586959,
+          "pr_auc": 0.9440865107382511,
+          "accuracy": 0.8600405679513184,
+          "precision": 0.8577935222672065,
+          "recall": 0.8621566632756866,
+          "f1": 0.8599695585996956,
+          "mcc": 0.7200921219600855
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9354424546711115,
+          "pr_auc": 0.940622291980182,
+          "accuracy": 0.8600806451612903,
+          "precision": 0.8953174245835209,
+          "recall": 0.8116326530612245,
+          "f1": 0.8514236780132733,
+          "mcc": 0.7229036428729574
+        },
+        "test_tuned": {
+          "threshold": 0.36,
+          "roc_auc": 0.9354424546711115,
+          "pr_auc": 0.940622291980182,
+          "accuracy": 0.8582661290322581,
+          "precision": 0.8498197837404886,
+          "recall": 0.8661224489795918,
+          "f1": 0.8578936729330907,
+          "mcc": 0.7166844553763934
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_v2_no_transformer_fold3.pth"
+      },
+      "4": {
+        "model": "v2 without Transformer (CNN + BiLSTM)",
+        "fold": 4,
+        "minutes": 1.26,
+        "best_epoch": 17,
+        "threshold": 0.42,
+        "validation": {
+          "threshold": 0.42,
+          "roc_auc": 0.9346058808644838,
+          "pr_auc": 0.9423534028917016,
+          "accuracy": 0.8609279918864098,
+          "precision": 0.8658064516129033,
+          "recall": 0.8532553407934893,
+          "f1": 0.8594850774945562,
+          "mcc": 0.7219165826709847
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9343075046751768,
+          "pr_auc": 0.9404908931814804,
+          "accuracy": 0.860383064516129,
+          "precision": 0.8813191581688001,
+          "recall": 0.8289795918367346,
+          "f1": 0.8543485119360605,
+          "mcc": 0.7217722960559069
+        },
+        "test_tuned": {
+          "threshold": 0.42,
+          "roc_auc": 0.9343075046751768,
+          "pr_auc": 0.9404908931814804,
+          "accuracy": 0.8568548387096774,
+          "precision": 0.8545232273838631,
+          "recall": 0.8559183673469388,
+          "f1": 0.8552202283849919,
+          "mcc": 0.7136742937160715
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_v2_no_transformer_fold4.pth"
+      },
+      "5": {
+        "model": "v2 without Transformer (CNN + BiLSTM)",
+        "fold": 5,
+        "minutes": 1.48,
+        "best_epoch": 21,
+        "threshold": 0.49,
+        "validation": {
+          "threshold": 0.49,
+          "roc_auc": 0.9389056437310384,
+          "pr_auc": 0.9469018397244489,
+          "accuracy": 0.8701660961075187,
+          "precision": 0.8778586278586279,
+          "recall": 0.8591047812817905,
+          "f1": 0.8683804627249357,
+          "mcc": 0.7404818839715422
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9320358565737054,
+          "pr_auc": 0.938189218401523,
+          "accuracy": 0.8580645161290322,
+          "precision": 0.8649665551839465,
+          "recall": 0.8444897959183674,
+          "f1": 0.8546055349029327,
+          "mcc": 0.7162031920663527
+        },
+        "test_tuned": {
+          "threshold": 0.49,
+          "roc_auc": 0.9320358565737054,
+          "pr_auc": 0.938189218401523,
+          "accuracy": 0.8581653225806452,
+          "precision": 0.8618189351564118,
+          "recall": 0.8489795918367347,
+          "f1": 0.8553510846098489,
+          "mcc": 0.7163162376008282
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_v2_no_transformer_fold5.pth"
+      }
+    },
+    "tri_v2_no_lstm": {
+      "1": {
+        "model": "v2 without BiLSTM (CNN + Transformer)",
+        "fold": 1,
+        "minutes": 1.32,
+        "best_epoch": 14,
+        "threshold": 0.49,
+        "validation": {
+          "threshold": 0.49,
+          "roc_auc": 0.9370591125987078,
+          "pr_auc": 0.9453294229961822,
+          "accuracy": 0.8648580121703854,
+          "precision": 0.8676244227809133,
+          "recall": 0.8601220752797558,
+          "f1": 0.8638569604086845,
+          "mcc": 0.7297335504953406
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.932337710382958,
+          "pr_auc": 0.93970269812907,
+          "accuracy": 0.8534274193548387,
+          "precision": 0.8588088296543107,
+          "recall": 0.8416326530612245,
+          "f1": 0.8501339929911359,
+          "mcc": 0.7068799305499104
+        },
+        "test_tuned": {
+          "threshold": 0.49,
+          "roc_auc": 0.932337710382958,
+          "pr_auc": 0.93970269812907,
+          "accuracy": 0.8515120967741936,
+          "precision": 0.8532261389404246,
+          "recall": 0.8446938775510204,
+          "f1": 0.8489385704030356,
+          "mcc": 0.702979548411846
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_v2_no_lstm_fold1.pth"
+      },
+      "2": {
+        "model": "v2 without BiLSTM (CNN + Transformer)",
+        "fold": 2,
+        "minutes": 1.71,
+        "best_epoch": 20,
+        "threshold": 0.43,
+        "validation": {
+          "threshold": 0.43,
+          "roc_auc": 0.9343071986150813,
+          "pr_auc": 0.9421496763610572,
+          "accuracy": 0.8633367139959433,
+          "precision": 0.8666495375128469,
+          "recall": 0.8578331637843337,
+          "f1": 0.8622188139059305,
+          "mcc": 0.7266998410588177
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9330052036750957,
+          "pr_auc": 0.9406949909343543,
+          "accuracy": 0.8553427419354839,
+          "precision": 0.8709055876685935,
+          "recall": 0.830204081632653,
+          "f1": 0.8500679134886636,
+          "mcc": 0.7112409410199609
+        },
+        "test_tuned": {
+          "threshold": 0.43,
+          "roc_auc": 0.9330052036750957,
+          "pr_auc": 0.9406949909343543,
+          "accuracy": 0.8536290322580645,
+          "precision": 0.8508343508343509,
+          "recall": 0.853265306122449,
+          "f1": 0.8520480945587936,
+          "mcc": 0.7072280366172594
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_v2_no_lstm_fold2.pth"
+      },
+      "3": {
+        "model": "v2 without BiLSTM (CNN + Transformer)",
+        "fold": 3,
+        "minutes": 1.13,
+        "best_epoch": 11,
+        "threshold": 0.49,
+        "validation": {
+          "threshold": 0.49,
+          "roc_auc": 0.934805752391258,
+          "pr_auc": 0.9438955583057165,
+          "accuracy": 0.865238336713996,
+          "precision": 0.8851006711409396,
+          "recall": 0.8385045778229908,
+          "f1": 0.8611727830743111,
+          "mcc": 0.7314395972569301
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9329367021709082,
+          "pr_auc": 0.9398016326055818,
+          "accuracy": 0.8585685483870967,
+          "precision": 0.875295127709809,
+          "recall": 0.8322448979591837,
+          "f1": 0.8532273250339993,
+          "mcc": 0.7177783305185994
+        },
+        "test_tuned": {
+          "threshold": 0.49,
+          "roc_auc": 0.9329367021709082,
+          "pr_auc": 0.9398016326055818,
+          "accuracy": 0.8585685483870967,
+          "precision": 0.8700529100529101,
+          "recall": 0.8389795918367347,
+          "f1": 0.8542337662337662,
+          "mcc": 0.7174220743107509
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_v2_no_lstm_fold3.pth"
+      },
+      "4": {
+        "model": "v2 without BiLSTM (CNN + Transformer)",
+        "fold": 4,
+        "minutes": 1.4,
+        "best_epoch": 15,
+        "threshold": 0.6,
+        "validation": {
+          "threshold": 0.6,
+          "roc_auc": 0.936666923390253,
+          "pr_auc": 0.9445922370267611,
+          "accuracy": 0.8662525354969574,
+          "precision": 0.8752935037829377,
+          "recall": 0.8532553407934893,
+          "f1": 0.8641339343206696,
+          "mcc": 0.7327130735246625
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9329749979673144,
+          "pr_auc": 0.9405380384880981,
+          "accuracy": 0.8504032258064517,
+          "precision": 0.8272030651340996,
+          "recall": 0.8812244897959184,
+          "f1": 0.8533596837944664,
+          "mcc": 0.7024576504314021
+        },
+        "test_tuned": {
+          "threshold": 0.6,
+          "roc_auc": 0.9329749979673144,
+          "pr_auc": 0.9405380384880981,
+          "accuracy": 0.8575604838709677,
+          "precision": 0.8613471502590674,
+          "recall": 0.8481632653061224,
+          "f1": 0.8547043701799486,
+          "mcc": 0.7151089524237672
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_v2_no_lstm_fold4.pth"
+      },
+      "5": {
+        "model": "v2 without BiLSTM (CNN + Transformer)",
+        "fold": 5,
+        "minutes": 1.53,
+        "best_epoch": 17,
+        "threshold": 0.39,
+        "validation": {
+          "threshold": 0.39,
+          "roc_auc": 0.9347484994592007,
+          "pr_auc": 0.9434735617436841,
+          "accuracy": 0.8563458856345886,
+          "precision": 0.8496127904071946,
+          "recall": 0.8649542217700915,
+          "f1": 0.8572148708254569,
+          "mcc": 0.7128199435754367
+        },
+        "test_at_0.5": {
+          "threshold": 0.5,
+          "roc_auc": 0.9329409911374908,
+          "pr_auc": 0.9392209522356395,
+          "accuracy": 0.8575604838709677,
+          "precision": 0.8809263709853616,
+          "recall": 0.8228571428571428,
+          "f1": 0.8509021842355176,
+          "mcc": 0.716378065856093
+        },
+        "test_tuned": {
+          "threshold": 0.39,
+          "roc_auc": 0.9329409911374908,
+          "pr_auc": 0.9392209522356395,
+          "accuracy": 0.8535282258064516,
+          "precision": 0.8393384524512699,
+          "recall": 0.87,
+          "f1": 0.8543942278785449,
+          "mcc": 0.7076021178197144
+        },
+        "checkpoint": "/content/drive/MyDrive/TFBS/results_v2/checkpoints/tri_v2_no_lstm_fold5.pth"
+      }
+    }
+  },
+  "summary": {
+    "pwm": {
+      "model": "JASPAR PWM scan (MA0478.2)",
+      "folds_completed": 5,
+      "roc_auc": {
+        "mean": 0.7846668428327506,
+        "std": 0.0
+      },
+      "pr_auc": {
+        "mean": 0.8336612816037363,
+        "std": 0.0
+      },
+      "accuracy": {
+        "mean": 0.751774193548387,
+        "std": 0.015477910689198647
+      },
+      "precision": {
+        "mean": 0.826444269917294,
+        "std": 0.05956601894124
+      },
+      "recall": {
+        "mean": 0.6371836734693878,
+        "std": 0.03573946634176288
+      },
+      "f1": {
+        "mean": 0.7172405943204365,
+        "std": 0.001621405849056911
+      },
+      "mcc": {
+        "mean": 0.5179819630091023,
+        "std": 0.04171951042693031
+      },
+      "threshold": {
+        "mean": 0.658
+      }
+    },
+    "kmer_lr": {
+      "model": "k-mer logistic regression",
+      "folds_completed": 5,
+      "roc_auc": {
+        "mean": 0.8930801365964711,
+        "std": 0.000326693985174214
+      },
+      "pr_auc": {
+        "mean": 0.8982925622621268,
+        "std": 0.0003509742798071499
+      },
+      "accuracy": {
+        "mean": 0.8079032258064516,
+        "std": 0.003280936416560188
+      },
+      "precision": {
+        "mean": 0.7893474304396367,
+        "std": 0.014396915622774224
+      },
+      "recall": {
+        "mean": 0.8343673469387755,
+        "std": 0.017488378958151737
+      },
+      "f1": {
+        "mean": 0.8109851266410896,
+        "std": 0.0013835312191054013
+      },
+      "mcc": {
+        "mean": 0.6174173653666647,
+        "std": 0.005197771842027057
+      },
+      "threshold": {
+        "mean": 0.434
+      }
+    },
+    "cnn": {
+      "model": "CNN (Baseline)",
+      "folds_completed": 5,
+      "roc_auc": {
+        "mean": 0.92424046670461,
+        "std": 0.002582945348211395
+      },
+      "pr_auc": {
+        "mean": 0.931841086027655,
+        "std": 0.002349966646993676
+      },
+      "accuracy": {
+        "mean": 0.8451209677419357,
+        "std": 0.0027814178838946775
+      },
+      "precision": {
+        "mean": 0.8421277750318105,
+        "std": 0.011172553238665714
+      },
+      "recall": {
+        "mean": 0.8451836734693877,
+        "std": 0.012146372326050639
+      },
+      "f1": {
+        "mean": 0.8435277803467652,
+        "std": 0.0021104385242981098
+      },
+      "mcc": {
+        "mean": 0.6904221334504955,
+        "std": 0.005188204392069704
+      },
+      "threshold": {
+        "mean": 0.40800000000000003
+      }
+    },
+    "cnn_bilstm": {
+      "model": "CNN + BiLSTM",
+      "folds_completed": 5,
+      "roc_auc": {
+        "mean": 0.9387181762744939,
+        "std": 0.001691925210535183
+      },
+      "pr_auc": {
+        "mean": 0.9444877378985526,
+        "std": 0.0014017352013369379
+      },
+      "accuracy": {
+        "mean": 0.8641532258064515,
+        "std": 0.0037533316365716226
+      },
+      "precision": {
+        "mean": 0.8590895052399554,
+        "std": 0.012474040234502794
+      },
+      "recall": {
+        "mean": 0.867591836734694,
+        "std": 0.011143866292047246
+      },
+      "f1": {
+        "mean": 0.8631965595813347,
+        "std": 0.002802109452221764
+      },
+      "mcc": {
+        "mean": 0.7285436037716294,
+        "std": 0.007212767124951692
+      },
+      "threshold": {
+        "mean": 0.512
+      }
+    },
+    "tri_branch": {
+      "model": "CNN + BiLSTM + Transformer",
+      "folds_completed": 5,
+      "roc_auc": {
+        "mean": 0.9106497642084722,
+        "std": 0.0076586553484807515
+      },
+      "pr_auc": {
+        "mean": 0.9189740428479596,
+        "std": 0.006535264032337917
+      },
+      "accuracy": {
+        "mean": 0.8250403225806451,
+        "std": 0.009504877762902653
+      },
+      "precision": {
+        "mean": 0.815595638123327,
+        "std": 0.010656374581582858
+      },
+      "recall": {
+        "mean": 0.8346530612244898,
+        "std": 0.017880393027293752
+      },
+      "f1": {
+        "mean": 0.8249087559967212,
+        "std": 0.01024761087410663
+      },
+      "mcc": {
+        "mean": 0.6504724217609916,
+        "std": 0.01912548821308285
+      },
+      "threshold": {
+        "mean": 0.43599999999999994
+      }
+    },
+    "tri_branch_v2": {
+      "model": "CNN + BiLSTM + Transformer (v2)",
+      "folds_completed": 5,
+      "roc_auc": {
+        "mean": 0.933788360842345,
+        "std": 0.0019530334251817453
+      },
+      "pr_auc": {
+        "mean": 0.9404153138830337,
+        "std": 0.0018065604939925465
+      },
+      "accuracy": {
+        "mean": 0.8547782258064516,
+        "std": 0.0042581628394684256
+      },
+      "precision": {
+        "mean": 0.8485362839761666,
+        "std": 0.01653971059921988
+      },
+      "recall": {
+        "mean": 0.8601224489795918,
+        "std": 0.015511949418448873
+      },
+      "f1": {
+        "mean": 0.854054507816741,
+        "std": 0.002305825896105112
+      },
+      "mcc": {
+        "mean": 0.710038158264579,
+        "std": 0.007837029896166822
+      },
+      "threshold": {
+        "mean": 0.30999999999999994
+      }
+    },
+    "tri_v2_no_transformer": {
+      "model": "v2 without Transformer (CNN + BiLSTM)",
+      "folds_completed": 5,
+      "roc_auc": {
+        "mean": 0.9338952231888772,
+        "std": 0.0012329211003772505
+      },
+      "pr_auc": {
+        "mean": 0.9398024189594676,
+        "std": 0.0009694265377325845
+      },
+      "accuracy": {
+        "mean": 0.8573387096774194,
+        "std": 0.0008415980429331503
+      },
+      "precision": {
+        "mean": 0.8605882194806191,
+        "std": 0.00851246976054388
+      },
+      "recall": {
+        "mean": 0.8488979591836735,
+        "std": 0.013024981603541505
+      },
+      "f1": {
+        "mean": 0.8545946542564561,
+        "std": 0.0024812782568326406
+      },
+      "mcc": {
+        "mean": 0.7148248843437833,
+        "std": 0.0015808253558273957
+      },
+      "threshold": {
+        "mean": 0.40199999999999997
+      }
+    },
+    "tri_v2_no_lstm": {
+      "model": "v2 without BiLSTM (CNN + Transformer)",
+      "folds_completed": 5,
+      "roc_auc": {
+        "mean": 0.9328391210667535,
+        "std": 0.00028167278086644313
+      },
+      "pr_auc": {
+        "mean": 0.9399916624785488,
+        "std": 0.0006137596612216393
+      },
+      "accuracy": {
+        "mean": 0.8549596774193547,
+        "std": 0.002978826380925907
+      },
+      "precision": {
+        "mean": 0.8549598005076046,
+        "std": 0.011539623316288538
+      },
+      "recall": {
+        "mean": 0.8510204081632653,
+        "std": 0.011815603939698074
+      },
+      "f1": {
+        "mean": 0.8528638058508177,
+        "std": 0.002433080265626855
+      },
+      "mcc": {
+        "mean": 0.7100681459166676,
+        "std": 0.005997618757895354
+      },
+      "threshold": {
+        "mean": 0.48
+      }
+    }
+  }
+}

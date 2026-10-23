@@ -466,3 +466,27 @@ th {
     width: 100%;
   }
 }
+
+/* Model picker next to the Run button */
+.model-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: #94a3b8;
+}
+.model-picker select {
+  background: #090d16;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 9px 10px;
+  font: inherit;
+  max-width: 100%;
+}
+@media (max-width: 720px) {
+  .model-picker { margin-left: 0; width: 100%; }
+  .model-picker select { flex: 1; min-width: 0; }
+}

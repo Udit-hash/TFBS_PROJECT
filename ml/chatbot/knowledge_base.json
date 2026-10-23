@@ -191,8 +191,8 @@
       "global",
       "positional encoding"
     ],
-    "beginner": "The transformer part lets every position in the DNA 'look at' every other position at once and decide which ones matter together. This is the same idea behind modern AI chatbots, applied to DNA.",
-    "advanced": "One pre-LayerNorm Transformer encoder layer (d_model = 48, 4 heads, sinusoidal positional encoding) operates on the CNN feature tokens. It computes softmax(QKᵀ/√d_k)V to model global pairwise dependencies. The CNN, BiLSTM and Transformer representations are concatenated (160-d) and passed to a dense classifier."
+    "beginner": "The transformer part lets every position in the DNA 'look at' every other position at once and decide which ones matter together. This is the same idea behind modern AI chatbots, applied to DNA. In our tests on FOSL2, adding the transformer did not improve accuracy. The short 101-letter sequences are already handled well by the CNN and BiLSTM.",
+    "advanced": "One pre-LayerNorm Transformer encoder layer (d_model = 48, 4 heads, sinusoidal positional encoding) operates on the CNN feature tokens. It computes softmax(QKᵀ/√d_k)V to model global pairwise dependencies. The CNN, BiLSTM and Transformer representations are concatenated (160-d) and passed to a dense classifier. Ablation (run 2): tri-branch v2 0.934 vs v2 without Transformer 0.934 test AUROC, so no measurable gain on 101 bp FOSL2 windows."
   },
   {
     "id": "probability",
@@ -393,8 +393,8 @@
       "overview",
       "app"
     ],
-    "beginner": "You paste a 101-letter DNA sequence. The AI model, a mix of three neural networks (CNN, BiLSTM and Transformer), predicts whether the protein FOSL2 is likely to bind there. It was trained on real ENCODE experiments in HepG2 liver cells. It then explains its answer by highlighting the important letters, testing mutations, finding known protein 'words' from the JASPAR library, and showing the result on a 3D DNA model.",
-    "advanced": "Pipeline: 101 bp input → one-hot (4 × 101) → tri-branch CNN (8/16/24 bp kernels) + BiLSTM + Transformer → fused representation → sigmoid. Trained on the ENCODE FOSL2 HepG2 ChIP-seq benchmark (wgEncodeAwgTfbsHaibHepg2Fosl2V0416101UniPk, ~39k train / ~10k test, dinucleotide-shuffled negatives) with 5-fold cross-validation against JASPAR-PWM, k-mer logistic regression, CNN and CNN+BiLSTM baselines. Explanations: ShiftSmooth saliency, ISM (303 substitutions), a JASPAR scan of the sequence, Monte-Carlo dropout intervals, and 3D mapping of attributions."
+    "beginner": "You paste a 101-letter DNA sequence and the AI model predicts whether the protein FOSL2 is likely to bind there. It was trained on real ENCODE experiments in HepG2 liver cells. By default the website uses the team's own design, a CNN + BiLSTM + Transformer (v2), which scored AUROC 0.934. A switch lets you compare it with simpler models, such as a CNN + BiLSTM (0.939). It then explains its answer by highlighting the important letters, testing mutations, finding known protein 'words' from the JASPAR library, and showing the result on a 3D DNA model.",
+    "advanced": "Data: ENCODE FOSL2 HepG2 ChIP-seq benchmark (~39k train / ~10k test, dinucleotide-shuffled negatives). 5-fold CV, same folds and recipe for all deep models (early stopping on validation AUROC, reverse-complement augmentation). Test AUROC (mean ± SD): JASPAR PWM 0.785, k-mer LR 0.893, CNN 0.924 ± 0.003, CNN+BiLSTM 0.939 ± 0.002, tri-branch v1 0.911 ± 0.008, tri-branch v2 (deeper trunk) 0.934 ± 0.002; removing the Transformer or BiLSTM from v2 gives 0.934/0.933, so the extra branches add no accuracy here. The website serves the proposed tri-branch v2 by default, with a switch to CNN+BiLSTM (validation-best), CNN and v1. Explanations: ShiftSmooth (best at locating real FOSL2 sites: core AUROC 0.84 vs 0.82 gradient, 0.72 Integrated Gradients), ISM, JASPAR scan, MC-dropout intervals."
   },
   {
     "id": "limitations",
