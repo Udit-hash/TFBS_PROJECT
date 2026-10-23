@@ -216,3 +216,9 @@ The **DNA tutor** (`ml/chatbot/`, endpoint `POST /chat`) explains DNA, transcrip
 - Train in Google Colab, not on a laptop. The API only needs the saved checkpoints.
 - PyTorch is capped at 2 CPU threads (`TORCH_NUM_THREADS`).
 - Stop the backend and the frontend with **Ctrl+C**. Nothing keeps running in the background afterwards.
+
+## Training all models on the real data (Google Colab)
+
+Open `notebooks/train_all_models_colab.ipynb` in Google Colab with a T4 GPU. It downloads the FOSL2 (HepG2) ENCODE benchmark used for the original CNN (101 bp, about 39k train and 10k test rows, from the [BERT-TFBS](https://github.com/ZX1998-12/BERT-TFBS) repository). It then trains the CNN, CNN + BiLSTM and CNN + BiLSTM + Transformer on identical data with 5-fold cross-validation via `ml/train_all.py`, and writes a mean ± SD results table. The DNA-shape model is an optional Part B. For a plain-language explanation of that feature, see `docs/DNA_SHAPE_EXPLAINED.md`.
+
+The synthetic generator (`ml/fetch_encode_data.py`) is only for demos and smoke tests. Never use it for reported results.
