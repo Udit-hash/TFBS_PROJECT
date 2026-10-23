@@ -30,6 +30,9 @@ export function summarisePrediction(result, sequence) {
     .slice(0, 6);
   return {
     binding_probability: result.binding_probability,
+    confidence_interval: result.confidence_interval,
+    threshold: result.threshold,
+    known_hits: viz.sequence_logo?.known_hits || [],
     prediction_label: result.prediction_label,
     motifs_detected: result.motifs_detected || [],
     core_sequence: viz.sequence_logo?.core_sequence,

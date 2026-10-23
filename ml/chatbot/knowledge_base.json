@@ -111,8 +111,8 @@
       "tomtom",
       "known motif"
     ],
-    "beginner": "JASPAR is a free online library of known transcription factor motifs. If our model highlights a DNA word, we can look it up in JASPAR to see which known TF it resembles, like checking a word in a dictionary.",
-    "advanced": "JASPAR is an open-access, curated database of non-redundant TF binding profiles stored as PFMs (IDs like MA0108 for TBP). Learned motifs are usually matched to JASPAR with Tomtom, which reports p-values and E-values for motif–motif similarity."
+    "beginner": "JASPAR is a free online library of known transcription factor motifs. If our model highlights a DNA word, we can look it up in JASPAR to see which known TF it resembles, like checking a word in a dictionary. The website scans your sequence with every vertebrate motif in JASPAR (about 900) and shows the known word that sits where the model was paying attention.",
+    "advanced": "JASPAR is an open-access, curated database of non-redundant TF binding profiles stored as PFMs (IDs like MA0108 for TBP). Learned motifs are usually matched to JASPAR with Tomtom, which reports p-values and E-values for motif–motif similarity. The app scans all JASPAR CORE vertebrate PWMs on both strands and reports hits above 75% of the maximum log-odds score, ranked by match strength times the mean saliency over the site."
   },
   {
     "id": "chipseq",
@@ -130,7 +130,7 @@
       "training data"
     ],
     "beginner": "ChIP-seq is a lab experiment that finds where a transcription factor sits on the DNA in real cells. ENCODE is a large public project that ran thousands of these experiments. Their results are like an answer key: the model learns from DNA pieces we already know are bound or not bound.",
-    "advanced": "Chromatin immunoprecipitation followed by sequencing (ChIP-seq) cross-links proteins to DNA, pulls down a target TF with an antibody, and sequences the bound fragments. Peak callers identify enriched regions. ENCODE provides standardised ChIP-seq peaks for many TFs and cell lines. Benchmarks typically take a fixed-length window around peak summits (for example 101 bp) as positives, and shuffled or background sequences as negatives."
+    "advanced": "Chromatin immunoprecipitation followed by sequencing (ChIP-seq) cross-links proteins to DNA, pulls down a target TF with an antibody, and sequences the bound fragments. Peak callers identify enriched regions. ENCODE provides standardised ChIP-seq peaks for many TFs and cell lines. Benchmarks typically take a fixed-length window around peak summits (for example 101 bp) as positives, and shuffled or background sequences as negatives. This project uses the FOSL2 HepG2 dataset from the Zeng et al. (2016) benchmark, the same family of 165 ENCODE datasets used by DeepSTF and MLSNet."
   },
   {
     "id": "one_hot",
@@ -207,10 +207,16 @@
       "prediction",
       "result",
       "verdict",
-      "how sure"
+      "how sure",
+      "cut-off",
+      "cutoff",
+      "interval",
+      "confidence interval",
+      "uncertainty",
+      "error bar"
     ],
-    "beginner": "The binding probability is the model's confidence that this DNA piece contains a binding site. 90% means 'very likely', and 10% means 'very unlikely'. Anything above 50% is labelled a potential binding site. It is a prediction, not a lab result.",
-    "advanced": "The score is sigmoid(logit) from the classifier, thresholded at 0.5. It is not necessarily well calibrated. Calibration (e.g. temperature scaling) and threshold tuning on a validation set would make the number more trustworthy as a probability. It reflects sequence-only evidence and ignores chromatin context."
+    "beginner": "The binding probability is the model's confidence that this DNA piece contains a binding site. 90% means 'very likely', and 10% means 'very unlikely'. The cut-off (shown on the verdict card) is the line between 'bound' and 'not bound'. It was chosen during training on data the model hadn't learned from, so it isn't always exactly 50%. The 95% interval shows how much the answer wobbles if the model is run many times with small random changes inside it. A narrow interval means the model is sure.",
+    "advanced": "p = sigmoid(logit). The decision cut-off is the value that maximised F1 on the validation fold during cross-validation and is stored in the checkpoint. The 95% interval comes from Monte-Carlo dropout: 30 stochastic forward passes with dropout active (batch-norm frozen), using the 2.5th–97.5th percentiles. It reflects model (epistemic) uncertainty only, and the probabilities are not formally calibrated."
   },
   {
     "id": "saliency",
@@ -329,6 +335,26 @@
     "advanced": "The CCAAT box sits about 60–100 bp upstream of the TSS in many promoters. NF-Y (NF-YA/NF-YB/NF-YC) binds it. NF-YB/NF-YC form a histone-like dimer that bends the DNA, while NF-YA inserts into the minor groove to read CCAAT specifically (PDB 4AWL)."
   },
   {
+    "id": "ap1_fosl2",
+    "title": "FOSL2 and the AP-1 site",
+    "keywords": [
+      "fosl2",
+      "ap-1",
+      "ap1",
+      "fos",
+      "jun",
+      "tgactca",
+      "tgagtca",
+      "leucine zipper",
+      "bzip",
+      "hepg2",
+      "fos-jun",
+      "1fos"
+    ],
+    "beginner": "FOSL2 is the protein this model learned about. It belongs to the AP-1 family (with Fos and Jun), which helps cells respond to signals like growth or stress. FOSL2 pairs up with a Jun protein, and together they grab the short DNA word TGACTCA (or TGAGTCA). When the model is confident, it usually lights up exactly that word. The 'Real structure' tab shows Fos and Jun gripping this site.",
+    "advanced": "FOSL2 (FRA-2) is a bZIP transcription factor that heterodimerises with JUN-family proteins through a leucine zipper. Its basic regions insert into the major groove of the palindromic TPA-response element TGA(C/G)TCA (JASPAR MA0478 for FOSL2). PDB 1FOS shows the c-Fos–c-Jun bZIP heterodimer bound to an AP-1 site. In HepG2 ChIP-seq, many FOSL2 peaks contain AP-1 sites, but not all, because cooperative or indirect binding also occurs."
+  },
+  {
     "id": "creb",
     "title": "CRE and CREB",
     "keywords": [
@@ -367,8 +393,8 @@
       "overview",
       "app"
     ],
-    "beginner": "You paste a 101-letter DNA sequence. The AI model, a mix of three neural networks (CNN, BiLSTM and Transformer), predicts whether a transcription factor is likely to bind there. It then explains its answer by highlighting the important letters, testing mutations, and showing the result on a 3D DNA model.",
-    "advanced": "Pipeline: 101 bp input → one-hot (4 × 101) → tri-branch CNN (8/16/24) + BiLSTM + Transformer → fused 160-d representation → sigmoid binding probability. Explanations: ShiftSmooth saliency, ISM (303 substitutions), a saliency-derived core window with motif lookup, and 3D mapping of attributions."
+    "beginner": "You paste a 101-letter DNA sequence. The AI model, a mix of three neural networks (CNN, BiLSTM and Transformer), predicts whether the protein FOSL2 is likely to bind there. It was trained on real ENCODE experiments in HepG2 liver cells. It then explains its answer by highlighting the important letters, testing mutations, finding known protein 'words' from the JASPAR library, and showing the result on a 3D DNA model.",
+    "advanced": "Pipeline: 101 bp input → one-hot (4 × 101) → tri-branch CNN (8/16/24 bp kernels) + BiLSTM + Transformer → fused representation → sigmoid. Trained on the ENCODE FOSL2 HepG2 ChIP-seq benchmark (wgEncodeAwgTfbsHaibHepg2Fosl2V0416101UniPk, ~39k train / ~10k test, dinucleotide-shuffled negatives) with 5-fold cross-validation against JASPAR-PWM, k-mer logistic regression, CNN and CNN+BiLSTM baselines. Explanations: ShiftSmooth saliency, ISM (303 substitutions), a JASPAR scan of the sequence, Monte-Carlo dropout intervals, and 3D mapping of attributions."
   },
   {
     "id": "limitations",
@@ -384,7 +410,7 @@
       "clinical",
       "diagnosis"
     ],
-    "beginner": "The model is a research tool, not a medical test. It only looks at the DNA letters, not at everything happening in a real cell. Predictions can be wrong and should be checked with lab experiments.",
-    "advanced": "Known limitations: sequence-only input (no chromatin accessibility, methylation or cofactors), fixed 101 bp context, uncalibrated probabilities, and performance tied to the training data. Gradient-based attributions can be noisy or saturate. Results are not for clinical use."
+    "beginner": "The model is a research tool, not a medical test. It was trained on one protein (FOSL2) in one cell type (liver cells), so it answers 'would FOSL2 bind here?' and not 'would any protein bind here?'. It only looks at the DNA letters, not at everything happening in a real cell. Predictions can be wrong and should be checked with lab experiments.",
+    "advanced": "Known limitations: single factor and cell line (FOSL2, HepG2); sequence-only input (no chromatin accessibility, methylation, cofactors or DNA shape, which are left for future work); fixed 101 bp context; dinucleotide-shuffled negatives, which are easier than genomic background negatives; MC-dropout intervals capture only part of the uncertainty. Not for clinical use."
   }
 ]

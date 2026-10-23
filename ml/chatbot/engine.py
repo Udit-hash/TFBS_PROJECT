@@ -158,6 +158,13 @@ def summarise_prediction(ctx: dict | None) -> str:
     prob = ctx.get("binding_probability")
     if prob is not None:
         lines.append(f"Binding probability: {prob * 100:.1f}% ({ctx.get('prediction_label', '')})")
+    if ctx.get("confidence_interval"):
+        lo, hi = ctx["confidence_interval"]
+        lines.append(f"95% interval (MC dropout): {lo * 100:.1f}-{hi * 100:.1f}%; decision cut-off {ctx.get('threshold', 0.5):.2f}")
+    if ctx.get("known_hits"):
+        lines.append("JASPAR motifs found: " + ", ".join(
+            f"{h['name']} at {h['start']}-{h['end'] - 1} ({h['strand']}, match {h['score']:.2f}, importance {h['saliency']:.2f})"
+            for h in ctx["known_hits"][:4]))
     if ctx.get("core_sequence"):
         lines.append(
             f"Most important window: {ctx['core_sequence']} starting at position "
@@ -264,7 +271,7 @@ def _explain_result_offline(ctx: dict, mode: str) -> str:
 # ============================================================
 
 SYSTEM_PROMPT = """You are the built-in tutor of a TFBS (transcription factor binding site) prediction web app built by an undergraduate team.
-The app's model is a CNN + BiLSTM + Transformer that reads a 101 bp DNA sequence and predicts the probability that a transcription factor binds it. It explains predictions with ShiftSmooth saliency, in-silico mutagenesis (ISM) and a 3D DNA view where base pairs are coloured by importance.
+The app's model is a CNN + BiLSTM + Transformer that reads a 101 bp DNA sequence and predicts the probability that the transcription factor FOSL2 (AP-1 family) binds it; it was trained on ENCODE ChIP-seq data from HepG2 liver cells. It explains predictions with ShiftSmooth saliency, in-silico mutagenesis (ISM) and a 3D DNA view where base pairs are coloured by importance.
 
 Rules:
 - Mode is "{mode}". In beginner mode: assume no biology or AI background, use everyday analogies, define any technical word the first time you use it, and keep it under 150 words. In advanced mode: be precise and technical, still under 220 words.

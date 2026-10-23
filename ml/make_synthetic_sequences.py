@@ -1,10 +1,17 @@
+"""
+SANITY-CHECK DATA ONLY (the mentor's "random input" test). Never used to train the real models.
+
+Makes random 101 bp sequences, half with a known motif pasted in, half without. Useful to show
+that random DNA gets a low score and planted motifs a high one. Writes to data/synthetic/.
+The real training data is the ENCODE FOSL2 HepG2 benchmark (see the Colab notebook).
+"""
 import os
 import random
 import pandas as pd
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-RAW_DIR = BASE_DIR / "data" / "raw"
+RAW_DIR = BASE_DIR / "data" / "synthetic"   # kept separate so it can never overwrite the real ENCODE data
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 TRAIN_CSV = RAW_DIR / "train.csv"

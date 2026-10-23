@@ -14,6 +14,9 @@ What it does (in plain words):
     rerun the same command and it continues where it stopped.
 
 Models:
+  pwm          - JASPAR motif scan (classic method, no training): best match of the TF's
+                 known binding pattern on either strand
+  kmer_lr      - k-mer counts + logistic regression (classic machine-learning baseline)
   cnn          - CNN baseline (models/cnn.py)
   cnn_bilstm   - CNN + BiLSTM (models/cnn_bilstm.py)
   tri_branch   - CNN + BiLSTM + Transformer (models/hybrid.py), the main model
@@ -28,7 +31,6 @@ from __future__ import annotations
 import argparse
 import json
 import random
-import shutil
 import time
 from pathlib import Path
 
@@ -39,9 +41,11 @@ from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
     f1_score,
+    matthews_corrcoef,
     precision_score,
     recall_score,
     roc_auc_score,
+    roc_curve,
 )
 from sklearn.model_selection import StratifiedKFold
 from torch import nn
@@ -52,13 +56,20 @@ from models.cnn import TFBS_CNN
 from models.cnn_bilstm import TFBS_CNN_BiLSTM
 from models.hybrid import TFBS_TriBranch
 from preprocessing import one_hot_encode
+from baselines import KmerLogReg, PWMScanner
+from motifs import JASPAR_DB, find_by_tf, load_motif_db
 
 MODELS = {
     "cnn": ("CNN", TFBS_CNN),
     "cnn_bilstm": ("CNN + BiLSTM", TFBS_CNN_BiLSTM),
     "tri_branch": ("CNN + BiLSTM + Transformer", TFBS_TriBranch),
 }
-REPORT_METRICS = ("roc_auc", "pr_auc", "accuracy", "precision", "recall", "f1")
+# Classic (non-deep-learning) baselines: trained/evaluated on exactly the same folds
+CLASSIC = {
+    "pwm": "JASPAR PWM scan",
+    "kmer_lr": "k-mer logistic regression",
+}
+REPORT_METRICS = ("roc_auc", "pr_auc", "accuracy", "precision", "recall", "f1", "mcc")
 
 
 # ------------------------------------------------------------------ data
@@ -112,6 +123,7 @@ def score(labels: np.ndarray, probabilities: np.ndarray, threshold: float) -> di
         "precision": float(precision_score(labels, predictions, zero_division=0)),
         "recall": float(recall_score(labels, predictions, zero_division=0)),
         "f1": float(f1_score(labels, predictions, zero_division=0)),
+        "mcc": float(matthews_corrcoef(labels, predictions)),
     }
 
 
@@ -169,7 +181,7 @@ def summarise(runs: dict) -> dict:
             continue
         row = {"model": done[0]["model"], "folds_completed": len(done)}
         for metric in REPORT_METRICS:
-            values = np.array([f["test_tuned"][metric] for f in done])
+            values = np.array([f["test_tuned"].get(metric, np.nan) for f in done])
             row[metric] = {"mean": float(values.mean()), "std": float(values.std(ddof=1)) if len(values) > 1 else 0.0}
         row["threshold"] = {"mean": float(np.mean([f["threshold"] for f in done]))}
         summary[key] = row
@@ -177,7 +189,8 @@ def summarise(runs: dict) -> dict:
 
 
 def markdown_table(summary: dict) -> str:
-    header = "| Model | Folds | AUROC | PR-AUC | Accuracy | Precision | Recall | F1 |\n|---|---|---|---|---|---|---|---|\n"
+    header = ("| Model | Folds | AUROC | PR-AUC | Accuracy | Precision | Recall | F1 | MCC |\n"
+              "|---|---|---|---|---|---|---|---|---|\n")
     lines = []
     for row in summary.values():
         cells = [f"{row[m]['mean']:.3f} ± {row[m]['std']:.3f}" for m in REPORT_METRICS]
@@ -199,21 +212,105 @@ def export_final_models(out_dir: Path, runs: dict) -> None:
     final_dir.mkdir(exist_ok=True)
     chosen = {}
     for key, folds in runs.items():
-        done = [f for f in folds.values() if "validation" in f and Path(f["checkpoint"]).exists()]
+        done = [f for f in folds.values() if "validation" in f and f.get("checkpoint") and Path(f["checkpoint"]).exists()]
         if not done:
             continue
         best = max(done, key=lambda f: f["validation"]["roc_auc"])
         target = final_dir / f"{key}.pth"
-        shutil.copy(best["checkpoint"], target)
+        # store the tuned cut-off inside the model file so the website can use it
+        ckpt = torch.load(best["checkpoint"], map_location="cpu")
+        ckpt["threshold"] = best["threshold"]
+        ckpt["validation"] = best["validation"]
+        torch.save(ckpt, target)
         chosen[key] = {"fold": best["fold"], "threshold": best["threshold"], "file": target.name}
     (final_dir / "chosen_folds.json").write_text(json.dumps(chosen, indent=2), encoding="utf-8")
 
 
+def plot_roc_curves(out_dir: Path, runs: dict, test_y: np.ndarray) -> None:
+    """One ROC curve per model (averaged over folds), saved as roc_curves.png for the paper."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    grid = np.linspace(0, 1, 201)
+    fig, ax = plt.subplots(figsize=(5, 5))
+    for key, folds in runs.items():
+        curves, aucs = [], []
+        for f in folds.values():
+            path = out_dir / "probs" / f"{key}_fold{f['fold']}.npy"
+            if "test_tuned" in f and path.exists():
+                fpr, tpr, _ = roc_curve(test_y, np.load(path))
+                curves.append(np.interp(grid, fpr, tpr))
+                aucs.append(f["test_tuned"]["roc_auc"])
+        if curves:
+            label = next(iter(folds.values()))["model"]
+            ax.plot(grid, np.mean(curves, axis=0), lw=2, label=f"{label} (AUROC {np.mean(aucs):.3f})")
+    ax.plot([0, 1], [0, 1], "--", color="grey", lw=1)
+    ax.set_xlabel("False positive rate")
+    ax.set_ylabel("True positive rate")
+    ax.set_title("ROC on the held-out test set (mean of 5 folds)")
+    ax.legend(loc="lower right", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(out_dir / "roc_curves.png", dpi=200)
+    plt.close(fig)
+
+
+def classic_model(key: str, args):
+    """Build a classic baseline, or return None (with a reason) if it can't run."""
+    if key == "kmer_lr":
+        return KmerLogReg(k=args.kmer), None
+    db = load_motif_db(JASPAR_DB)
+    if not db:
+        return None, f"{JASPAR_DB} not found (run: python -c 'import motifs; motifs.fetch_jaspar_core()')"
+    hits = find_by_tf(db, args.tf)
+    if not hits:
+        return None, f"no JASPAR matrix named {args.tf}"
+    return PWMScanner(hits[0]["pfm"], hits[0]["id"]), None
+
+
 # ------------------------------------------------------------------ main
+
+def run_classic(key, args, splits, train_seq, train_y, test_seq, test_y, x_train, x_test, runs, out_dir, config):
+    """Same folds, same cut-off rule and same test set as the deep models."""
+    name = CLASSIC[key]
+    runs.setdefault(key, {})
+    for fold, (fit_idx, val_idx) in enumerate(splits, start=1):
+        if "test_tuned" in runs[key].get(str(fold), {}):
+            print(f"{name} fold {fold}: already done, skipping.")
+            continue
+        model, problem = classic_model(key, args)
+        if model is None:
+            print(f"Skipping {name}: {problem}")
+            runs.pop(key, None)
+            return
+        started = time.time()
+        if key == "pwm":  # scores one-hot input, nothing to fit
+            val_prob = model.predict_proba(x_train[val_idx].numpy())
+            test_prob = model.predict_proba(x_test.numpy())
+        else:
+            model.fit(list(train_seq[fit_idx]), train_y[fit_idx])
+            val_prob = model.predict_proba(list(train_seq[val_idx]))
+            test_prob = model.predict_proba(list(test_seq))
+        np.save(out_dir / "probs" / f"{key}_fold{fold}.npy", test_prob)
+        threshold = best_threshold(train_y[val_idx], val_prob)
+        runs[key][str(fold)] = {
+            "model": name + (f" ({model.motif_id})" if key == "pwm" else ""),
+            "fold": fold,
+            "minutes": round((time.time() - started) / 60, 2),
+            "threshold": threshold,
+            "validation": score(train_y[val_idx], val_prob, threshold),
+            "test_at_0.5": score(test_y, test_prob, 0.5),
+            "test_tuned": score(test_y, test_prob, threshold),
+        }
+        save_progress(out_dir, runs, config)
+        t = runs[key][str(fold)]["test_tuned"]
+        print(f"{name} fold {fold}: test AUROC {t['roc_auc']:.3f}, F1 {t['f1']:.3f} (cut-off {threshold})")
+
 
 def run(args) -> dict:
     out_dir = Path(args.out)
     (out_dir / "checkpoints").mkdir(parents=True, exist_ok=True)
+    (out_dir / "probs").mkdir(parents=True, exist_ok=True)
     data_dir = Path(args.data_dir)
     train_seq, train_y = load_split(data_dir / "train_clean.csv")
     test_seq, test_y = load_split(data_dir / "test_clean.csv")
@@ -231,15 +328,15 @@ def run(args) -> dict:
     x_train, x_test = encode_all(train_seq), encode_all(test_seq)
 
     models = [m.strip() for m in args.models.split(",") if m.strip()]
-    unknown = [m for m in models if m not in MODELS]
+    unknown = [m for m in models if m not in MODELS and m not in CLASSIC]
     if unknown:
-        raise ValueError(f"Unknown model(s): {unknown}. Choose from {list(MODELS)}")
+        raise ValueError(f"Unknown model(s): {unknown}. Choose from {list(CLASSIC) + list(MODELS)}")
 
     config = {
         "folds": args.folds, "epochs": args.epochs, "patience": args.patience,
         "batch_size": args.batch_size, "seed": args.seed, "quick": args.quick,
         "train_size": int(len(train_y)), "test_size": int(len(test_y)),
-        "sequence_length": SEQUENCE_LENGTH, "models": models,
+        "sequence_length": SEQUENCE_LENGTH, "models": models, "tf": args.tf,
     }
     results_path = out_dir / "cv_results.json"
     runs = {}
@@ -252,8 +349,12 @@ def run(args) -> dict:
     splits = list(StratifiedKFold(n_splits=args.folds, shuffle=True, random_state=args.seed)
                   .split(np.zeros(len(train_y)), train_y))
     test_loader = make_loader(x_test, test_y, np.arange(len(test_y)), args.batch_size, False)
+    np.save(out_dir / "probs" / "test_labels.npy", test_y)
 
     for key in models:
+        if key in CLASSIC:
+            run_classic(key, args, splits, train_seq, train_y, test_seq, test_y, x_train, x_test, runs, out_dir, config)
+            continue
         name, model_class = MODELS[key]
         runs.setdefault(key, {})
         for fold, (fit_idx, val_idx) in enumerate(splits, start=1):
@@ -279,6 +380,7 @@ def run(args) -> dict:
 
             val_prob = predict_probabilities(model, val_loader)
             test_prob = predict_probabilities(model, test_loader)
+            np.save(out_dir / "probs" / f"{key}_fold{fold}.npy", test_prob)
             threshold = best_threshold(train_y[val_idx], val_prob)
             runs[key][str(fold)] = {
                 "model": name,
@@ -296,6 +398,7 @@ def run(args) -> dict:
 
     summary = save_progress(out_dir, runs, config)
     export_final_models(out_dir, runs)
+    plot_roc_curves(out_dir, runs, test_y)
     print("\n" + markdown_table(summary))
     return summary
 
@@ -304,7 +407,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data-dir", default=str(PROCESSED_DATA_DIR), help="folder with train_clean.csv and test_clean.csv")
     parser.add_argument("--out", default=str(Path(__file__).resolve().parent / "results"), help="where results and checkpoints go")
-    parser.add_argument("--models", default="cnn,cnn_bilstm,tri_branch")
+    parser.add_argument("--models", default="pwm,kmer_lr,cnn,cnn_bilstm,tri_branch")
+    parser.add_argument("--tf", default="FOSL2", help="transcription factor name for the JASPAR PWM baseline")
+    parser.add_argument("--kmer", type=int, default=5, help="k for the k-mer baseline")
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--epochs", type=int, default=25)
     parser.add_argument("--patience", type=int, default=5)

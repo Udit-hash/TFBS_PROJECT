@@ -4,6 +4,7 @@ import DnaHelix3D from './components/DnaHelix3D';
 import StructureViewer from './components/StructureViewer';
 import ChatPanel from './components/ChatPanel';
 import { summarisePrediction } from './lib/api';
+import { REAL_EXAMPLES } from './lib/examples';
 import { chip } from './components/ui';
 
 const VIEWS = [
@@ -19,10 +20,12 @@ const NUCLEOTIDE_THEMES = {
   T: { bg: 'rgba(239, 68, 68, 0.15)', border: '#ef4444', text: '#f87171', bar: '#ef4444' }
 };
 
+// The model is trained on FOSL2 ChIP-seq, so the test motif is FOSL2's own binding site:
+// the AP-1 site TGA(C/G)TCA (JASPAR MA0478).
 const MOTIF_POOL = [
-  { name: 'TATA_BOX', seq: 'TATAAA' },
-  { name: 'GC_BOX', seq: 'GGGCGG' },
-  { name: 'CAAT_BOX', seq: 'CCAAT' }
+  { name: 'AP-1 site', seq: 'ATGACTCAT' },
+  { name: 'AP-1 site', seq: 'GTGAGTCAC' },
+  { name: 'AP-1 site', seq: 'CTGACTCAG' }
 ];
 
 export default function App() {
@@ -34,6 +37,7 @@ export default function App() {
   const [view, setView] = useState('3d');
   const [chatOpen, setChatOpen] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState(null);
+  const [exampleIndex, setExampleIndex] = useState(0);
 
   // "Ask the tutor about this" buttons in the 3D and structure views
   const askTutor = (question) => {
@@ -62,6 +66,11 @@ export default function App() {
         seqArr[insertPos + i] = selected.seq[i];
       }
       setSequence(seqArr.join(''));
+    } else if (type === 'real') {
+      const ex = REAL_EXAMPLES[exampleIndex % REAL_EXAMPLES.length];
+      setExampleIndex((i) => i + 1);
+      setSequence(ex.sequence);
+      setUploadedFile(`real test sequence ${ex.id}: ${ex.kind}`);
     } else {
       setSequence(getRandomBases(101));
     }
@@ -164,8 +173,11 @@ export default function App() {
                   onChange={handleSequenceFile}
                 />
               </label>
+              <button className="preset-btn" onClick={() => loadPreset('real')}>
+                + Real FOSL2 Example
+              </button>
               <button className="preset-btn" onClick={() => loadPreset('positive')}>
-                + Generate Random Motif Sequence
+                + Random DNA with AP-1 Site
               </button>
               <button className="preset-btn ghost" onClick={() => loadPreset('negative')}>
                 + Control Sequence
@@ -186,7 +198,7 @@ export default function App() {
           />
           <div className="input-hint">
             {uploadedFile
-              ? `Loaded ${uploadedFile}.`
+              ? `Loaded ${uploadedFile}`
               : 'Upload a single FASTA record (.fa, .fasta, .fna) or paste a 101 bp sequence.'}
           </div>
 
@@ -216,21 +228,29 @@ export default function App() {
                 <div className="progress-track">
                   <div className="progress-fill" style={{ width: `${result.binding_probability * 100}%` }} />
                 </div>
+                {result.confidence_interval && (
+                  <div className="motif-meta">
+                    95% interval: {(result.confidence_interval[0] * 100).toFixed(1)}–{(result.confidence_interval[1] * 100).toFixed(1)}%
+                  </div>
+                )}
               </div>
 
               <div className="metric-card">
                 <span className="metric-label">Functional Verdict</span>
                 <div className="verdict-text">{result.prediction_label}</div>
                 <span className={`verdict-badge ${result.prediction === 1 ? 'success' : 'neutral'}`}>
-                  Threshold: 0.50
+                  Cut-off: {(result.threshold ?? 0.5).toFixed(2)}{result.trained_on ? ` · trained on ${result.trained_on}` : ''}
                 </span>
               </div>
 
               <div className="metric-card">
-                <span className="metric-label">Recovered Motif / JASPAR Profile</span>
+                <span className="metric-label">Known Motif in the Important Region (JASPAR)</span>
                 <div className="motif-name">{result.visualizations?.sequence_logo?.matched_jaspar_id}</div>
                 <div className="motif-meta">
-                  Core: <span>{result.visualizations?.sequence_logo?.core_sequence}</span> (Pos {result.visualizations?.sequence_logo?.window_start})
+                  Site: <span>{result.visualizations?.sequence_logo?.core_sequence}</span> (Pos {result.visualizations?.sequence_logo?.window_start}
+                  {result.visualizations?.sequence_logo?.strand ? `, ${result.visualizations.sequence_logo.strand} strand` : ''})
+                  {result.visualizations?.sequence_logo?.match_score != null &&
+                    ` · match ${(result.visualizations.sequence_logo.match_score * 100).toFixed(0)}%`}
                 </div>
               </div>
             </div>
@@ -317,9 +337,33 @@ export default function App() {
               </div>
             )}
 
-            {view === 'tracks' && result.visualizations?.sequence_logo && (
+            {view === 'tracks' && result.visualizations?.sequence_logo?.known_hits?.length > 0 && (
               <div className="panel analysis-panel">
-                <h3 className="table-title">3. Learned Motif Frequency Weights</h3>
+                <h3 className="table-title">3. Known Motifs Found in This Sequence (JASPAR scan)</h3>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Motif</th><th>Position</th><th>Strand</th><th>Match</th><th>Model importance there</th></tr>
+                    </thead>
+                    <tbody>
+                      {result.visualizations.sequence_logo.known_hits.map((h) => (
+                        <tr key={h.id}>
+                          <td className="mut-name">{h.name} <span style={{ opacity: 0.6 }}>{h.id}</span></td>
+                          <td>{h.start}–{h.end - 1}</td>
+                          <td>{h.strand}</td>
+                          <td>{(h.score * 100).toFixed(0)}%</td>
+                          <td>{h.saliency.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {view === 'tracks' && result.visualizations?.sequence_logo?.frequency_matrix?.length > 0 && (
+              <div className="panel analysis-panel">
+                <h3 className="table-title">4. Matched JASPAR Motif: Letter Frequencies per Position</h3>
                 <div className="logo-grid">
                   {result.visualizations.sequence_logo.frequency_matrix.map((col, idx) => (
                     <div key={idx} className="logo-column">

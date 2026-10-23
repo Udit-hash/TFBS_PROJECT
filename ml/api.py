@@ -6,9 +6,13 @@ from pydantic import BaseModel, Field
 import torch
 import numpy as np
 
+import os
+
 import chatbot  # loads ml/.env (if present) before config reads TORCH_NUM_THREADS
+import xai
 from config import DEVICE, SEQUENCE_LENGTH, MODEL_DIR
-from models.hybrid import TFBS_TriBranch
+from models.loader import build_hybrid_from_state, load_model
+from motifs import JASPAR_DB, load_motif_db, revcomp_matrix, scan_scores, score_range, to_ppm, to_pwm
 from preprocessing import one_hot_encode
 
 app = FastAPI(
@@ -40,118 +44,44 @@ class ChatInput(BaseModel):
     history: List[ChatTurn] = []
     prediction: Optional[dict] = None  # compact summary of the current /predict result
 
+# Only used when the JASPAR file is missing (exact consensus words)
 KNOWN_MOTIFS = {
-    "TATA_BOX": "TATAAA",
-    "GC_BOX": "GGGCGG",
-    "CAAT_BOX": "CCAAT"
+    "AP-1 (FOS/JUN)": "TGACTCA",
+    "AP-1 (FOS/JUN) ": "TGAGTCA",
+    "CRE (CREB)": "TGACGTCA",
+    "TATA box (TBP)": "TATAAA",
+    "GC box (SP1)": "GGGCGG",
+    "CCAAT box (NF-Y)": "CCAAT",
 }
 
 # ============================================================
-# LOAD MODEL
+# LOAD MODEL (+ the cut-off tuned on validation data during training)
 # ============================================================
 HYBRID_PATH = MODEL_DIR / "best_hybrid.pth"
 CNN_PATH = MODEL_DIR / "best_cnn.pth"
+TF_NAME = os.environ.get("TFBS_TF", "FOSL2")  # the factor the model was trained on
 
 
 def _load_hybrid_checkpoint(checkpoint):
-    state = checkpoint["model_state_dict"]
-    model = TFBS_TriBranch(seq_len=SEQUENCE_LENGTH)
+    """Kept for older tests: rebuild a tri-branch model from a checkpoint dict."""
+    return build_hybrid_from_state(checkpoint["model_state_dict"], SEQUENCE_LENGTH)
+
+
+model, MODEL_INFO, _load_errors = None, None, []
+for _path in (HYBRID_PATH, CNN_PATH):
+    if not _path.exists():
+        continue
     try:
-        model.load_state_dict(state)
-        return model
-    except RuntimeError as current_layout_error:
-        try:
-            conv_channels = state["conv8.weight"].shape[0]
-            for name, kernel_size in (("conv8", 8), ("conv16", 16), ("conv24", 24)):
-                if tuple(state[f"{name}.weight"].shape) != (
-                    conv_channels,
-                    4,
-                    kernel_size,
-                ):
-                    raise ValueError("Inconsistent multi-scale convolution dimensions.")
+        model, MODEL_INFO = load_model(_path, device=DEVICE, seq_len=SEQUENCE_LENGTH)
+        break
+    except RuntimeError as exc:  # incompatible file: try the next one
+        _load_errors.append(f"{_path.name}: {exc}")
+if model is None:
+    raise FileNotFoundError(f"No usable model in {MODEL_DIR}. {' '.join(_load_errors)}")
 
-            lstm_gates, lstm_input = state["bilstm.weight_ih_l0"].shape
-            if lstm_gates % 4 or lstm_input != conv_channels * 3:
-                raise ValueError("Unsupported BiLSTM dimensions in checkpoint.")
-            lstm_hidden = lstm_gates // 4
-
-            classifier_weight = state["classifier.0.weight"]
-            classifier_hidden, classifier_input = classifier_weight.shape
-            expected_input = conv_channels * 6 + lstm_hidden * 2
-            if classifier_input != expected_input:
-                raise ValueError("Checkpoint classifier does not match its branches.")
-
-            classifier_output = state["classifier.4.weight"].shape[0]
-            has_intermediate = classifier_output != 1
-            if has_intermediate and tuple(state["classifier.7.weight"].shape) != (
-                1,
-                classifier_output,
-            ):
-                raise ValueError("Unsupported hybrid classifier layout.")
-
-            compatible_model = TFBS_TriBranch(
-                seq_len=SEQUENCE_LENGTH,
-                conv_channels=conv_channels,
-                lstm_hidden=lstm_hidden,
-                classifier_hidden=classifier_hidden,
-                classifier_intermediate=has_intermediate,
-                classifier_output=classifier_output,
-            )
-            compatible_model.load_state_dict(state)
-        except (IndexError, KeyError, RuntimeError, ValueError) as compatibility_error:
-            raise RuntimeError(
-                "The hybrid checkpoint is incompatible with both supported model "
-                f"layouts: {compatibility_error}"
-            ) from current_layout_error
-
-        print(
-            "Loaded hybrid checkpoint using its saved architecture "
-            f"({conv_channels} channels per convolution, "
-            f"{lstm_hidden} BiLSTM units)."
-        )
-        return compatible_model
-
-
-if HYBRID_PATH.exists():
-    MODEL_PATH = HYBRID_PATH
-    CURRENT_ARCH = "CNN + BiLSTM + Transformer"
-    print(f"Loading Hybrid Model from {MODEL_PATH}")
-    checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
-    try:
-        model = _load_hybrid_checkpoint(checkpoint)
-    except RuntimeError as hybrid_error:
-        if not CNN_PATH.exists():
-            raise RuntimeError(
-                f"Hybrid checkpoint at {HYBRID_PATH} is incompatible and no CNN checkpoint is available."
-            ) from hybrid_error
-
-        from models.cnn import TFBS_CNN
-
-        MODEL_PATH = CNN_PATH
-        model = TFBS_CNN()
-        CURRENT_ARCH = "CNN (Baseline)"
-        print(
-            f"Hybrid checkpoint is incompatible ({hybrid_error}); "
-            f"falling back to {MODEL_PATH}"
-        )
-        checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
-        model.load_state_dict(checkpoint["model_state_dict"])
-elif CNN_PATH.exists():
-    from models.cnn import TFBS_CNN
-
-    MODEL_PATH = CNN_PATH
-    model = TFBS_CNN()
-    CURRENT_ARCH = "CNN (Baseline)"
-    print(f"Hybrid checkpoint not found. Loading {MODEL_PATH}")
-    checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
-    model.load_state_dict(checkpoint["model_state_dict"])
-else:
-    raise FileNotFoundError(f"Neither {HYBRID_PATH} nor {CNN_PATH} found in {MODEL_DIR}")
-
-model = model.to(DEVICE)
-model.eval()
-
-print(f"Model successfully operational: {CURRENT_ARCH}")
+CURRENT_ARCH = MODEL_INFO["arch"]
+THRESHOLD = MODEL_INFO["threshold"]
+print(f"Model operational: {CURRENT_ARCH} from {MODEL_INFO['path']} (cut-off {THRESHOLD:.2f})")
 
 
 def _forward_model(x):
@@ -161,46 +91,12 @@ def _forward_model(x):
 # ============================================================
 # INTERPRETABILITY: 1. SHIFTSMOOTH SALIENCY (Section IV-C)
 # ============================================================
-def calculate_shiftsmooth_saliency(
-    sequence: str,
-    num_shifts: int = 5,
-    max_shift: int = 2,
-):
-    """
-    ShiftSmooth Attribution: Extends SmoothGrad by averaging gradients
-    over small input sequence shifts to reduce noise and provide stable attribution.
-    """
-    encoded = one_hot_encode(sequence)
-    base_tensor = torch.tensor(encoded, dtype=torch.float32, device=DEVICE)
-    accumulated_grads = torch.zeros(SEQUENCE_LENGTH, device=DEVICE)
-    
-    shifts = list(range(-max_shift, max_shift + 1))
-    
-    for shift in shifts:
-        # Roll sequence by shift positions
-        shifted_tensor = torch.roll(base_tensor, shifts=shift, dims=1)
-        x = shifted_tensor.unsqueeze(0).clone().detach().requires_grad_(True)
-        
-        model.zero_grad()
-        out = _forward_model(x)
-        out.backward()
-        
-        # Extract gradient and roll back to original alignment
-        grad = x.grad.detach().squeeze(0)  # (4, seq_len)
-        grad = torch.max(torch.abs(grad), dim=0).values
-        unshifted_grad = torch.roll(grad, shifts=-shift, dims=0)
-        accumulated_grads += unshifted_grad
-
-    # Average attributions over all shifts
-    saliency = (accumulated_grads / len(shifts)).cpu().numpy()
-    
-    min_v, max_v = saliency.min(), saliency.max()
-    if max_v > min_v:
-        saliency = (saliency - min_v) / (max_v - min_v)
-    else:
-        saliency = np.zeros_like(saliency)
-
+def calculate_shiftsmooth_saliency(sequence: str, max_shift: int = 2):
+    """Gradients averaged over small shifts of the sequence (see xai.py), scaled to 0..1."""
+    x = one_hot_encode(sequence)[None]
+    saliency = xai.normalise(xai.shiftsmooth(model, x, device=DEVICE, max_shift=max_shift)[0])
     return [round(float(v), 4) for v in saliency]
+
 
 # ============================================================
 # INTERPRETABILITY: 2. IN SILICO MUTAGENESIS (Section IV-C)
@@ -244,43 +140,82 @@ def calculate_ism(sequence: str, base_prob: float):
     return top, position_effect
 
 # ============================================================
-# INTERPRETABILITY: 3. SEQUENCE LOGOS / JASPAR MOTIF MATCHING (Section IV-C)
+# INTERPRETABILITY: 3. KNOWN MOTIFS (JASPAR) IN THE SEQUENCE (Section IV-C)
 # ============================================================
-def extract_motif_logos(sequence: str, saliency_map: list):
-    """
-    Recovers salient binding cores and formats position frequency vectors 
-    matching curated JASPAR motif syntax.
-    """
-    # Find highest saliency peak window of 6-8 bp
-    arr = np.array(saliency_map)
-    window_size = 6
-    best_start = 0
-    max_score = 0
-    
-    for i in range(len(arr) - window_size):
-        score = arr[i:i+window_size].sum()
-        if score > max_score:
-            max_score = score
-            best_start = i
-            
-    core_subseq = sequence[best_start:best_start+window_size]
-    
-    # Check JASPAR / canonical correspondence
-    matched_jaspar = "MA0108.1 (TBP)" if "TATA" in core_subseq else ("MA0079.3 (SP1)" if "GC" in core_subseq else "De Novo Candidate Motif")
-    
-    # Generate nucleotide frequencies for visualization logo
-    logo_data = []
-    for char in core_subseq:
-        weights = {"A": 0.05, "C": 0.05, "G": 0.05, "T": 0.05}
-        weights[char] = 0.85
-        logo_data.append(weights)
-        
+MOTIF_DB = load_motif_db(JASPAR_DB)
+_PWMS = []
+for _m in MOTIF_DB:
+    _pwm = to_pwm(_m["pfm"])
+    _lo, _hi = score_range(_pwm)
+    _PWMS.append((_m, _pwm, to_ppm(_m["pfm"]), _lo, _hi))
+print(f"JASPAR motifs loaded: {len(_PWMS)}" if _PWMS else
+      f"JASPAR file not found ({JASPAR_DB}); motif matching falls back to the saliency window.")
+
+STRONG_MATCH = 0.85  # relative motif score (0 = worst possible, 1 = perfect consensus)
+
+
+def _saliency_peak(saliency, width: int = 10) -> int:
+    arr = np.asarray(saliency)
+    sums = np.convolve(arr, np.ones(width), mode="valid")
+    return int(np.argmax(sums))
+
+
+def motif_analysis(sequence: str, saliency: list) -> dict:
+    """Scan the sequence with every JASPAR motif and report the known motif that best explains
+    the region the model found important. The logo shown is the real JASPAR matrix."""
+    peak = _saliency_peak(saliency)
+    sal = np.asarray(saliency)
+    if not _PWMS:
+        return {
+            "core_sequence": sequence[peak:peak + 10],
+            "window_start": peak,
+            "matched_jaspar_id": "JASPAR database not installed",
+            "match_score": None,
+            "frequency_matrix": [],
+            "known_hits": [],
+        }
+
+    x = one_hot_encode(sequence)[None]
+    hits = []
+    for m, pwm, ppm, lo, hi in _PWMS:
+        sc = scan_scores(x, pwm)[0]                     # (2 strands, positions)
+        strand_i, pos = np.unravel_index(int(sc.argmax()), sc.shape)
+        rel = (float(sc[strand_i, pos]) - lo) / (hi - lo)
+        if rel < 0.75:
+            continue
+        w = len(pwm)
+        hits.append({
+            "id": m["id"], "name": m["name"], "start": int(pos), "end": int(pos + w),
+            "strand": "+" if strand_i == 0 else "-", "score": round(rel, 3),
+            "saliency": round(float(sal[pos:pos + w].mean()), 3),
+            "_ppm": ppm if strand_i == 0 else revcomp_matrix(ppm),
+        })
+    # Rank: strong motif match that also sits where the model is looking
+    hits.sort(key=lambda h: -(h["score"] * (0.5 + h["saliency"])))
+    best = hits[0] if hits else None
+    trained_tf = [h for h in hits if h["name"].upper() == TF_NAME.upper()]
+    if trained_tf and trained_tf[0]["score"] >= STRONG_MATCH:
+        best = trained_tf[0]  # prefer the factor the model was trained on when it clearly matches
+
+    known = [{k: v for k, v in h.items() if not k.startswith("_")} for h in hits[:8]]
+    if best is None:
+        return {
+            "core_sequence": sequence[peak:peak + 10], "window_start": peak,
+            "matched_jaspar_id": "No known motif matches the important region",
+            "match_score": None, "frequency_matrix": [], "known_hits": known,
+        }
     return {
-        "core_sequence": core_subseq,
-        "window_start": best_start,
-        "matched_jaspar_id": matched_jaspar,
-        "frequency_matrix": logo_data
+        "core_sequence": sequence[best["start"]:best["end"]],
+        "window_start": best["start"],
+        "matched_jaspar_id": f"{best['id']} ({best['name']})",
+        "match_score": best["score"],
+        "strand": best["strand"],
+        "frequency_matrix": [
+            {b: round(float(v), 3) for b, v in zip("ACGT", row)} for row in best["_ppm"]
+        ],
+        "known_hits": known,
     }
+
 
 # ============================================================
 # ENDPOINTS
@@ -289,6 +224,9 @@ def extract_motif_logos(sequence: str, saliency_map: list):
 async def root():
     return {
         "model": CURRENT_ARCH,
+        "trained_on": TF_NAME,
+        "threshold": THRESHOLD,
+        "jaspar_motifs": len(_PWMS),
         "status": "operational",
         "device": str(DEVICE),
         "chatbot": "llm" if chatbot.llm_settings() else "offline"
@@ -318,20 +256,27 @@ async def predict_tfbs(data: SequenceInput):
     with torch.no_grad():
         logits = _forward_model(x)
         probability = torch.sigmoid(logits).item()
+    # 95% interval from Monte-Carlo dropout (30 extra passes with dropout switched on)
+    _, ci_low, ci_high = xai.mc_dropout_interval(model, x, device=DEVICE, passes=30)
 
-    prediction = 1 if probability >= 0.5 else 0
+    prediction = 1 if probability >= THRESHOLD else 0
     prediction_label = "Potential TF Binding Site" if prediction == 1 else "Low TF Binding Potential"
 
-    detected = [name for name, motif in KNOWN_MOTIFS.items() if motif in seq]
     saliency = calculate_shiftsmooth_saliency(seq)
     ism, ism_position_effect = calculate_ism(seq, probability)
-    motif_logo = extract_motif_logos(seq, saliency)
+    motif_logo = motif_analysis(seq, saliency)
+    detected = sorted({h["name"] for h in motif_logo["known_hits"] if h["score"] >= STRONG_MATCH})
+    if not _PWMS:  # no JASPAR file: fall back to exact consensus words
+        detected = [name for name, motif in KNOWN_MOTIFS.items() if motif in seq]
 
     response = {
         "status": "success",
         "model": CURRENT_ARCH,
         "input_length": len(seq),
         "binding_probability": round(probability, 4),
+        "confidence_interval": [round(float(ci_low[0]), 4), round(float(ci_high[0]), 4)],
+        "threshold": round(THRESHOLD, 3),
+        "trained_on": TF_NAME,
         "prediction": prediction,
         "prediction_label": prediction_label,
         "motifs_detected": detected,

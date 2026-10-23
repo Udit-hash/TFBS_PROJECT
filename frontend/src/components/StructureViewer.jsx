@@ -2,25 +2,32 @@ import { useEffect, useRef, useState } from 'react';
 import { C, mono, panelStyle, sectionTitle, chip } from './ui';
 
 // Experimentally solved protein–DNA complexes from the RCSB Protein Data Bank.
+// `family` lists JASPAR motif names that belong to the same protein family.
 export const STRUCTURES = [
   {
-    id: '1CDW', tf: 'TBP', site: 'TATA box', match: (r) => hasMotif(r, 'TATA_BOX') || /TBP|TATA/.test(r.core),
+    id: '1FOS', tf: 'c-Fos / c-Jun (AP-1)', site: 'AP-1 site (TGA(C/G)TCA)',
+    family: ['FOS', 'FOSL1', 'FOSL2', 'FOSB', 'JUN', 'JUNB', 'JUND', 'BATF', 'BATF3', 'FOS::JUN', 'FOSL2::JUN', 'FOSL1::JUN', 'FOS::JUNB', 'FOSL2::JUNB'],
+    core: /TGA[CG]TCA/,
+    blurb: 'FOSL2, the protein our model was trained on, belongs to this family. Fos and Jun pair up through a "leucine zipper", and their two long helices grip the DNA in the major groove like a pair of tweezers, each reading half of the TGA(C/G)TCA site.',
+  },
+  {
+    id: '1DH3', tf: 'CREB', site: 'CRE (TGACGTCA)', family: ['CREB1', 'ATF1', 'CREM', 'ATF7'], core: /TGACGTCA/,
+    blurb: 'A close cousin of AP-1. Two CREB proteins form a pair, and their long helices insert into the major groove like chopsticks gripping the DNA.',
+  },
+  {
+    id: '1CDW', tf: 'TBP', site: 'TATA box', family: ['TBP'], core: /TATA[AT]A/,
     blurb: 'TATA-binding protein grabs the TATA box from the minor groove and bends the DNA sharply, like a saddle sitting on it.',
   },
   {
-    id: '1AAY', tf: 'Zif268 (EGR1)', site: 'GC-rich site', match: (r) => hasMotif(r, 'GC_BOX') || /SP1/.test(r.jaspar),
+    id: '1AAY', tf: 'Zif268 (EGR1)', site: 'GC-rich site', family: ['EGR1', 'EGR2', 'SP1', 'SP2', 'KLF4'], core: /GGGCGG/,
     blurb: 'A three-zinc-finger protein from the same family as SP1. Each "finger" reads 3 bases in the major groove. It is shown because it is the classic, well-resolved example of how SP1-like proteins read GC-rich DNA.',
   },
   {
-    id: '4AWL', tf: 'NF-Y', site: 'CCAAT box', match: (r) => hasMotif(r, 'CAAT_BOX') || /CCAAT/.test(r.core),
+    id: '4AWL', tf: 'NF-Y', site: 'CCAAT box', family: ['NFYA', 'NFYB', 'NFYC'], core: /CCAAT/,
     blurb: 'A three-part complex. Two subunits wrap the DNA like a histone, and the third reaches into the minor groove to read CCAAT.',
   },
   {
-    id: '1DH3', tf: 'CREB', site: 'CRE (TGACGTCA)', match: (r) => /TGACG|CGTCA/.test(r.core),
-    blurb: 'Two CREB proteins form a pair. Their long helices insert into the major groove like chopsticks gripping the DNA.',
-  },
-  {
-    id: '5KKQ', tf: 'CTCF', site: 'CTCF core site', match: (r) => /CCCTC|GAGGG/.test(r.core),
+    id: '5KKQ', tf: 'CTCF', site: 'CTCF core site', family: ['CTCF', 'CTCFL'], core: /CCGCG.GG.GGCAG/,
     blurb: 'Five of CTCF’s eleven zinc fingers wrap around the DNA, following the major groove.',
   },
 ];
@@ -29,18 +36,18 @@ const DNA_RESN = ['DA', 'DC', 'DG', 'DT'];
 const DNA_COLORS = { DA: '#10b981', DC: '#3b82f6', DG: '#f59e0b', DT: '#ef4444' };
 const VIEWER_SRC = 'https://3Dmol.org/build/3Dmol-min.js';
 
-function hasMotif(r, name) {
-  return (r.motifs || []).includes(name);
-}
-
 export function pickStructure(result) {
   const viz = result?.visualizations || {};
-  const info = {
-    motifs: result?.motifs_detected || [],
-    core: viz.sequence_logo?.core_sequence || '',
-    jaspar: viz.sequence_logo?.matched_jaspar_id || '',
-  };
-  return STRUCTURES.find((s) => s.match(info)) || null;
+  const logo = viz.sequence_logo || {};
+  // 1) the JASPAR motif matched in the important region, 2) any strong JASPAR hit, 3) the site letters
+  const best = (logo.matched_jaspar_id || '').replace(/^.*\(|\)$/g, '').toUpperCase();
+  const names = [best, ...(result?.motifs_detected || []).map((n) => n.toUpperCase())];
+  for (const name of names) {
+    const s = STRUCTURES.find((st) => st.family.includes(name));
+    if (s) return s;
+  }
+  const core = logo.core_sequence || '';
+  return STRUCTURES.find((st) => st.core.test(core)) || null;
 }
 
 // Load the 3Dmol.js viewer only when this tab is first opened (keeps the app light).
