@@ -1,0 +1,17 @@
+{
+  "cnn": {
+    "fold": 1,
+    "threshold": 0.65,
+    "file": "cnn.pth"
+  },
+  "cnn_bilstm": {
+    "fold": 1,
+    "threshold": 0.31,
+    "file": "cnn_bilstm.pth"
+  },
+  "tri_branch": {
+    "fold": 3,
+    "threshold": 0.65,
+    "file": "tri_branch.pth"
+  }
+}

@@ -77,11 +77,40 @@ def integrated_gradients(model, x, device="cpu", steps: int = 32) -> np.ndarray:
     return attributions.sum(dim=1).abs().cpu().numpy()
 
 
+def integrated_gradients_shuffled(model, x, device="cpu", steps: int = 16, n_refs: int = 8, seed: int = 0) -> np.ndarray:
+    """Integrated Gradients averaged over several dinucleotide-shuffled copies of each sequence as
+    references (the usual choice in genomics, as in DeepLIFT/DeepSHAP), instead of a flat 0.25 baseline."""
+    import random
+    from data_utils import dinucleotide_shuffle, one_hot_batch
+
+    x_np = x if isinstance(x, np.ndarray) else x.detach().cpu().numpy()
+    seqs = ["".join("ACGT"[i] for i in row.argmax(axis=0)) for row in x_np]
+    rng = random.Random(seed)
+    xt = _to_tensor(x_np, device)
+    out = torch.zeros(xt.shape[0], xt.shape[2], device=device)
+    with _grad_mode(model):
+        for _ in range(n_refs):
+            ref = _to_tensor(one_hot_batch([dinucleotide_shuffle(s, rng) for s in seqs]), device)
+            total = torch.zeros_like(xt)
+            for alpha in (np.arange(steps) + 0.5) / steps:
+                total += _input_grad(model, ref + float(alpha) * (xt - ref))
+            out += ((xt - ref) * total / steps).sum(dim=1).abs()
+    return (out / n_refs).cpu().numpy()
+
+
+def random_importance(model, x, device="cpu", seed: int = 0) -> np.ndarray:
+    """Chance level for the comparison: random numbers instead of an explanation."""
+    x_np = x if isinstance(x, np.ndarray) else x.detach().cpu().numpy()
+    return np.random.default_rng(seed + len(x_np)).random((x_np.shape[0], x_np.shape[2]))
+
+
 METHODS = {
     "Gradient (saliency)": gradient,
     "Gradient × input": gradient_x_input,
     "ShiftSmooth": shiftsmooth,
-    "Integrated Gradients": integrated_gradients,
+    "Integrated Gradients (flat 0.25 reference)": integrated_gradients,
+    "Integrated Gradients (shuffled references)": integrated_gradients_shuffled,
+    "Random (chance level)": random_importance,
 }
 
 

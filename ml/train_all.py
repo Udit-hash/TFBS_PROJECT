@@ -52,18 +52,14 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from config import DEVICE, LEARNING_RATE, PROCESSED_DATA_DIR, RANDOM_SEED, SEQUENCE_LENGTH
-from models.cnn import TFBS_CNN
-from models.cnn_bilstm import TFBS_CNN_BiLSTM
-from models.hybrid import TFBS_TriBranch
+from models.loader import ARCH_NAMES, build
 from preprocessing import one_hot_encode
 from baselines import KmerLogReg, PWMScanner
 from motifs import JASPAR_DB, find_by_tf, load_motif_db
 
-MODELS = {
-    "cnn": ("CNN", TFBS_CNN),
-    "cnn_bilstm": ("CNN + BiLSTM", TFBS_CNN_BiLSTM),
-    "tri_branch": ("CNN + BiLSTM + Transformer", TFBS_TriBranch),
-}
+# key -> display name; the networks themselves are built by models/loader.py
+MODELS = {key: ARCH_NAMES[key] for key in (
+    "cnn", "cnn_bilstm", "tri_branch", "tri_branch_v2", "tri_v2_no_transformer", "tri_v2_no_lstm")}
 # Classic (non-deep-learning) baselines: trained/evaluated on exactly the same folds
 CLASSIC = {
     "pwm": "JASPAR PWM scan",
@@ -130,8 +126,13 @@ def score(labels: np.ndarray, probabilities: np.ndarray, threshold: float) -> di
 # -------------------------------------------------------------- training
 
 def train_one(model: nn.Module, name: str, fit_loader: DataLoader, val_loader: DataLoader,
-              val_labels: np.ndarray, fit_labels: np.ndarray, epochs: int, patience: int) -> nn.Module:
-    """Train with early stopping; keep the weights from the epoch with the best validation F1."""
+              val_labels: np.ndarray, fit_labels: np.ndarray, epochs: int, patience: int,
+              rc_augment: bool = True) -> tuple[nn.Module, int]:
+    """Train with early stopping; keep the weights from the epoch with the best validation AUROC.
+
+    rc_augment: each training sequence is shown as its reverse complement with probability 0.5
+    (the other DNA strand). The binding site is the same on both strands, so this is free extra data.
+    """
     model = model.to(DEVICE)
     positives, negatives = int(fit_labels.sum()), int(len(fit_labels) - fit_labels.sum())
     # Weight the loss so both classes count equally even if the data is a bit unbalanced
@@ -139,12 +140,16 @@ def train_one(model: nn.Module, name: str, fit_loader: DataLoader, val_loader: D
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=5e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3, min_lr=1e-6)
 
-    best_f1, best_state, stale = -1.0, None, 0
+    best_auc, best_state, stale, best_epoch = -1.0, None, 0, 0
     for epoch in range(1, epochs + 1):
         model.train()
         total_loss, seen = 0.0, 0
         for sequence, labels in fit_loader:
             sequence, labels = sequence.to(DEVICE), labels.to(DEVICE).unsqueeze(1)
+            if rc_augment:
+                # A,C,G,T channel order: flipping channels swaps A<->T and C<->G; flipping length reverses
+                flip = torch.rand(sequence.size(0), device=DEVICE) < 0.5
+                sequence = torch.where(flip[:, None, None], sequence.flip(dims=(1, 2)), sequence)
             optimizer.zero_grad(set_to_none=True)
             loss = criterion(model(sequence), labels)
             loss.backward()
@@ -155,11 +160,11 @@ def train_one(model: nn.Module, name: str, fit_loader: DataLoader, val_loader: D
         val_prob = predict_probabilities(model, val_loader)
         val_f1 = f1_score(val_labels, (val_prob >= 0.5).astype(int), zero_division=0)
         val_auc = roc_auc_score(val_labels, val_prob)
-        scheduler.step(val_f1)
+        scheduler.step(val_auc)
         print(f"  {name} epoch {epoch}/{epochs}: train loss {total_loss / seen:.4f} | val F1 {val_f1:.4f} | val AUROC {val_auc:.4f}")
 
-        if val_f1 > best_f1:
-            best_f1, stale = val_f1, 0
+        if val_auc > best_auc + 1e-4:
+            best_auc, stale, best_epoch = val_auc, 0, epoch
             best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
         else:
             stale += 1
@@ -168,7 +173,7 @@ def train_one(model: nn.Module, name: str, fit_loader: DataLoader, val_loader: D
                 break
 
     model.load_state_dict(best_state)
-    return model
+    return model, best_epoch
 
 
 # ------------------------------------------------------------- reporting
@@ -224,6 +229,16 @@ def export_final_models(out_dir: Path, runs: dict) -> None:
         torch.save(ckpt, target)
         chosen[key] = {"fold": best["fold"], "threshold": best["threshold"], "file": target.name}
     (final_dir / "chosen_folds.json").write_text(json.dumps(chosen, indent=2), encoding="utf-8")
+    # The model for the website = deep model with the best MEAN VALIDATION AUROC (test set never used)
+    deep = {k: np.mean([f["validation"]["roc_auc"] for f in folds.values() if "validation" in f])
+            for k, folds in runs.items() if k in MODELS and k in chosen}
+    if deep:
+        best_key = max(deep, key=deep.get)
+        (final_dir / "best_model.json").write_text(json.dumps({
+            "model_type": best_key, "name": MODELS[best_key], "file": chosen[best_key]["file"],
+            "mean_validation_auroc": deep[best_key],
+            "all_mean_validation_auroc": deep,
+        }, indent=2), encoding="utf-8")
 
 
 def plot_roc_curves(out_dir: Path, runs: dict, test_y: np.ndarray) -> None:
@@ -335,6 +350,7 @@ def run(args) -> dict:
     config = {
         "folds": args.folds, "epochs": args.epochs, "patience": args.patience,
         "batch_size": args.batch_size, "seed": args.seed, "quick": args.quick,
+        "rc_augment": not args.no_rc, "early_stopping": "validation AUROC",
         "train_size": int(len(train_y)), "test_size": int(len(test_y)),
         "sequence_length": SEQUENCE_LENGTH, "models": models, "tf": args.tf,
     }
@@ -355,7 +371,7 @@ def run(args) -> dict:
         if key in CLASSIC:
             run_classic(key, args, splits, train_seq, train_y, test_seq, test_y, x_train, x_test, runs, out_dir, config)
             continue
-        name, model_class = MODELS[key]
+        name = MODELS[key]
         runs.setdefault(key, {})
         for fold, (fit_idx, val_idx) in enumerate(splits, start=1):
             if "test_tuned" in runs[key].get(str(fold), {}):
@@ -371,11 +387,12 @@ def run(args) -> dict:
 
             print(f"\n=== {name} | fold {fold}/{args.folds} ===")
             started = time.time()
-            model = train_one(model_class(), name, fit_loader, val_loader,
-                              train_y[val_idx], train_y[fit_idx], args.epochs, args.patience)
+            model, best_epoch = train_one(build(key), name, fit_loader, val_loader,
+                                          train_y[val_idx], train_y[fit_idx], args.epochs, args.patience,
+                                          rc_augment=not args.no_rc)
 
             checkpoint = out_dir / "checkpoints" / f"{key}_fold{fold}.pth"
-            torch.save({"model_type": key, "model_state_dict": model.state_dict(),
+            torch.save({"model_type": key, "model_kwargs": {}, "model_state_dict": model.state_dict(),
                         "sequence_length": SEQUENCE_LENGTH, "fold": fold, "random_seed": seed}, checkpoint)
 
             val_prob = predict_probabilities(model, val_loader)
@@ -386,6 +403,7 @@ def run(args) -> dict:
                 "model": name,
                 "fold": fold,
                 "minutes": round((time.time() - started) / 60, 2),
+                "best_epoch": best_epoch,
                 "threshold": threshold,
                 "validation": score(train_y[val_idx], val_prob, threshold),
                 "test_at_0.5": score(test_y, test_prob, 0.5),
@@ -407,12 +425,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data-dir", default=str(PROCESSED_DATA_DIR), help="folder with train_clean.csv and test_clean.csv")
     parser.add_argument("--out", default=str(Path(__file__).resolve().parent / "results"), help="where results and checkpoints go")
-    parser.add_argument("--models", default="pwm,kmer_lr,cnn,cnn_bilstm,tri_branch")
+    parser.add_argument("--models", default="pwm,kmer_lr,cnn,cnn_bilstm,tri_branch,tri_branch_v2,"
+                                              "tri_v2_no_transformer,tri_v2_no_lstm")
+    parser.add_argument("--no-rc", action="store_true", help="turn off reverse-complement augmentation")
     parser.add_argument("--tf", default="FOSL2", help="transcription factor name for the JASPAR PWM baseline")
     parser.add_argument("--kmer", type=int, default=5, help="k for the k-mer baseline")
     parser.add_argument("--folds", type=int, default=5)
-    parser.add_argument("--epochs", type=int, default=25)
-    parser.add_argument("--patience", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--patience", type=int, default=6)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--seed", type=int, default=RANDOM_SEED)
     parser.add_argument("--quick", action="store_true", help="tiny run (2000 rows, 2 folds, 1 epoch) to check everything works")

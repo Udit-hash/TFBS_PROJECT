@@ -84,5 +84,6 @@ notebooks/
 - The 3D helix is an idealised DNA model built from the input sequence. The colours show the model's importance scores, not measured atomic contacts.
 - The structure tab loads lab-measured protein–DNA structures from the Protein Data Bank (1FOS, 1DH3, 1CDW, 1AAY, 4AWL, 5KKQ) as reference examples. It needs internet access.
 - DNA shape features (mentioned in the paper) are left for future work; the project is Python + JavaScript only.
+- `results/run1_fosl2/` holds the first Colab run (tables, ROC curves, filter logos). `ml/motifs/jaspar_core_vertebrates.json` is JASPAR 2024 CORE vertebrates (open access, CC BY 4.0).
 - `docs/PROJECT_EXPLAINED.md` explains every part of the project in plain language (useful for the viva).
 - Tests: `cd ml && python -m unittest discover tests`

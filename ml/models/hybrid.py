@@ -128,3 +128,65 @@ class TFBS_TriBranch(nn.Module):
         
     def forward(self, x):
         return self.classifier(self.encode_sequence(x))
+
+class TFBS_TriBranchV2(nn.Module):
+    """
+    Tri-branch model, version 2: same idea as TFBS_TriBranch (multi-scale CNN feeding a BiLSTM
+    and a Transformer), but with a deeper shared convolution trunk, because version 1's single
+    thin convolution layer limited it (it scored below the CNN baselines on FOSL2).
+
+      multi-scale conv (8/16/24 bp, `filters` each) -> BN -> ReLU -> max-pool 2
+      conv 5 bp (`trunk_channels`)                  -> BN -> ReLU -> max-pool 2   (~25 positions)
+      branch 1: global max over the trunk (CNN summary)
+      branch 2: BiLSTM over the 25 positions        (switch off with use_lstm=False)
+      branch 3: Transformer encoder over them       (switch off with use_transformer=False)
+      concatenate -> small classifier -> 1 logit
+
+    The switches give the ablation models used in the paper's comparison.
+    """
+
+    def __init__(self, seq_len=101, filters=32, trunk_channels=128, lstm_hidden=64, nhead=4,
+                 ff_dim=256, dropout=0.3, use_lstm=True, use_transformer=True):
+        super().__init__()
+        self.use_lstm = use_lstm
+        self.use_transformer = use_transformer
+        self.conv8 = nn.Conv1d(4, filters, kernel_size=8, padding=4)
+        self.conv16 = nn.Conv1d(4, filters, kernel_size=16, padding=8)
+        self.conv24 = nn.Conv1d(4, filters, kernel_size=24, padding=12)
+        self.bn1 = nn.BatchNorm1d(filters * 3)
+        self.conv2 = nn.Conv1d(filters * 3, trunk_channels, kernel_size=5, padding=2)
+        self.bn2 = nn.BatchNorm1d(trunk_channels)
+        self.pool = nn.MaxPool1d(kernel_size=2, stride=2)
+        self.drop = nn.Dropout(dropout)
+
+        fused = trunk_channels
+        if use_lstm:
+            self.bilstm = nn.LSTM(trunk_channels, lstm_hidden, batch_first=True, bidirectional=True)
+            fused += 2 * lstm_hidden
+        if use_transformer:
+            self.pos_encoder = PositionalEncoding(d_model=trunk_channels, max_len=150)
+            layer = nn.TransformerEncoderLayer(d_model=trunk_channels, nhead=nhead, dim_feedforward=ff_dim,
+                                               dropout=dropout, batch_first=True, norm_first=True)
+            self.transformer = nn.TransformerEncoder(layer, num_layers=1)
+            fused += trunk_channels
+        self.classifier = nn.Sequential(
+            nn.Linear(fused, 128), nn.GELU(), nn.Dropout(dropout), nn.Linear(128, 1)
+        )
+
+    def encode_sequence(self, x):
+        c8, c16, c24 = self.conv8(x), self.conv16(x), self.conv24(x)
+        n = min(c8.size(2), c16.size(2), c24.size(2))
+        h = torch.cat([c8[:, :, :n], c16[:, :, :n], c24[:, :, :n]], dim=1)
+        h = self.pool(F.relu(self.bn1(h)))
+        h = self.drop(self.pool(F.relu(self.bn2(self.conv2(h)))))    # (B, C, ~25)
+        reps = [h.amax(dim=2)]
+        tokens = h.permute(0, 2, 1)                                    # (B, ~25, C)
+        if self.use_lstm:
+            out, _ = self.bilstm(tokens)
+            reps.append(out.amax(dim=1))
+        if self.use_transformer:
+            reps.append(self.transformer(self.pos_encoder(tokens)).amax(dim=1))
+        return torch.cat(reps, dim=1)
+
+    def forward(self, x):
+        return self.classifier(self.encode_sequence(x))

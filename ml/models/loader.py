@@ -15,13 +15,31 @@ import torch
 
 from models.cnn import TFBS_CNN
 from models.cnn_bilstm import TFBS_CNN_BiLSTM
-from models.hybrid import TFBS_TriBranch
+from models.hybrid import TFBS_TriBranch, TFBS_TriBranchV2
 
 ARCH_NAMES = {
     "cnn": "CNN (Baseline)",
     "cnn_bilstm": "CNN + BiLSTM",
     "tri_branch": "CNN + BiLSTM + Transformer",
+    "tri_branch_v2": "CNN + BiLSTM + Transformer (v2)",
+    "tri_v2_no_transformer": "v2 without Transformer (CNN + BiLSTM)",
+    "tri_v2_no_lstm": "v2 without BiLSTM (CNN + Transformer)",
 }
+
+# model_type -> (class, default keyword arguments); used by train_all.py and the website
+FACTORIES = {
+    "cnn": (TFBS_CNN, {}),
+    "cnn_bilstm": (TFBS_CNN_BiLSTM, {}),
+    "tri_branch": (TFBS_TriBranch, {}),
+    "tri_branch_v2": (TFBS_TriBranchV2, {}),
+    "tri_v2_no_transformer": (TFBS_TriBranchV2, {"use_transformer": False}),
+    "tri_v2_no_lstm": (TFBS_TriBranchV2, {"use_lstm": False}),
+}
+
+
+def build(model_type: str, **overrides):
+    cls, kwargs = FACTORIES[model_type]
+    return cls(**{**kwargs, **overrides})
 
 
 def build_hybrid_from_state(state: dict, seq_len: int = 101) -> TFBS_TriBranch:
@@ -74,11 +92,8 @@ def load_model(path: str | Path, device="cpu", seq_len: int = 101):
 
     if model_type == "tri_branch":
         model = build_hybrid_from_state(state, seq_len)
-    elif model_type == "cnn_bilstm":
-        model = TFBS_CNN_BiLSTM()
-        model.load_state_dict(state)
-    elif model_type == "cnn":
-        model = TFBS_CNN()
+    elif model_type in FACTORIES:
+        model = build(model_type, **checkpoint.get("model_kwargs", {}))
         model.load_state_dict(state)
     else:
         raise ValueError(f"Unknown model_type {model_type!r} in {path}")
