@@ -68,7 +68,10 @@ DEFAULT_KEY = os.environ.get("TFBS_MODEL_KEY", "tri_branch_v2")
 HYBRID_PATH = MODEL_DIR / "best_hybrid.pth"
 CNN_PATH = MODEL_DIR / "best_cnn.pth"
 TF_NAME = os.environ.get("TFBS_TF", "FOSL2")  # the factor the model was trained on
-RESULTS_JSON = MODEL_DIR.parent.parent / "results" / "run2_fosl2" / "cv_results.json"
+RESULTS_JSON = Path(os.environ.get(
+    "TFBS_RESULTS_JSON",
+    MODEL_DIR.parent.parent / "results" / "run2_fosl2" / "cv_results.json",
+))
 
 
 def _load_hybrid_checkpoint(checkpoint):
@@ -79,8 +82,19 @@ def _load_hybrid_checkpoint(checkpoint):
 def _test_auroc() -> dict:
     try:
         import json
-        summary = json.loads(RESULTS_JSON.read_text())["summary"]
-        return {k: round(v["roc_auc"]["mean"], 3) for k, v in summary.items()}
+        results = json.loads(RESULTS_JSON.read_text())
+        fingerprint = results["config"].get("dataset_fingerprint")
+        # Older packaged checkpoints and results predate fingerprints; retain their paired metrics.
+        return {
+            key: round(results["summary"][key]["roc_auc"]["mean"], 3)
+            for key, (_, info) in LOADED.items()
+            if (
+                info.get("dataset_fingerprint") == fingerprint
+                if fingerprint
+                else info.get("dataset_fingerprint") is None
+            )
+            and key in results["summary"]
+        }
     except (OSError, KeyError, ValueError):
         return {}
 

@@ -103,6 +103,8 @@ def load_model(path: str | Path, device="cpu", seq_len: int = 101):
         "arch": ARCH_NAMES[model_type],
         "threshold": float(checkpoint.get("threshold", 0.5)),
         "validation": checkpoint.get("validation"),
+        "dataset_sha256": checkpoint.get("dataset_sha256"),
+        "dataset_fingerprint": checkpoint.get("dataset_fingerprint"),
         "path": str(path),
     }
     return model.to(device).eval(), info

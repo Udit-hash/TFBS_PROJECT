@@ -195,7 +195,7 @@ export default function App() {
                 + Random DNA with AP-1 Site
               </button>
               <button className="preset-btn ghost" onClick={() => loadPreset('negative')}>
-                + Control Sequence
+                + Random Sequence Demo
               </button>
             </div>
           </div>
@@ -254,16 +254,17 @@ export default function App() {
           <div className="results-stack">
             <div className="stats-grid">
               <div className="metric-card accent">
-                <span className="metric-label">Binding Probability</span>
+                <span className="metric-label">Estimated Binding Probability</span>
                 <div className="metric-value">{(result.binding_probability * 100).toFixed(2)}%</div>
                 <div className="progress-track">
                   <div className="progress-fill" style={{ width: `${result.binding_probability * 100}%` }} />
                 </div>
                 {result.confidence_interval && (
                   <div className="motif-meta">
-                    95% interval: {(result.confidence_interval[0] * 100).toFixed(1)}–{(result.confidence_interval[1] * 100).toFixed(1)}%
+                    95% Monte-Carlo dropout interval: {(result.confidence_interval[0] * 100).toFixed(1)}–{(result.confidence_interval[1] * 100).toFixed(1)}%
                   </div>
                 )}
+                <div className="motif-meta">Per-sequence model score, not accuracy; probability calibration has not been evaluated.</div>
               </div>
 
               <div className="metric-card">
@@ -273,7 +274,7 @@ export default function App() {
                   Cut-off: {(result.threshold ?? 0.5).toFixed(2)}{result.trained_on ? ` · trained on ${result.trained_on}` : ''}
                 </span>
                 <span className="motif-meta" style={{ display: 'block', marginTop: '8px' }}>
-                  {result.model}{result.model_test_auroc ? ` · test AUROC ${result.model_test_auroc.toFixed(3)}` : ''}
+                  {result.model}{result.model_test_auroc ? ` · held-out benchmark AUROC ${result.model_test_auroc.toFixed(3)}` : ''}
                 </span>
               </div>
 

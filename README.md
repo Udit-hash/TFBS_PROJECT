@@ -3,7 +3,7 @@
 Predicts whether a **101 bp DNA sequence** contains a transcription factor binding site, and explains why.
 
 - **Models:** the main **CNN + BiLSTM + Transformer** model, compared against a CNN, a CNN + BiLSTM, a k-mer logistic regression and a JASPAR motif (PWM) scan.
-- **Data:** ENCODE ChIP-seq for the transcription factor **FOSL2** in HepG2 cells, from the [BERT-TFBS](https://github.com/ZX1998-12/BERT-TFBS) benchmark. About 39k training and 10k test sequences. Bound sites are labelled 1; shuffled copies are labelled 0.
+- **Data:** ENCODE ChIP-seq for the transcription factor **FOSL2** in HepG2 cells, from the [BERT-TFBS](https://github.com/ZX1998-12/BERT-TFBS) benchmark. The official split has 39,439 training and 9,920 test sequences. Bound sites are labelled 1; shuffled copies are labelled 0.
 - **Explanations:** ShiftSmooth saliency, in-silico mutagenesis (ISM), a scan of the sequence against ~900 known **JASPAR** motifs, a 95% interval for the probability (Monte-Carlo dropout), a **3D DNA helix** coloured by importance, and a **real protein–DNA structure** viewer (e.g. Fos–Jun/AP-1 for FOSL2).
 - **What the model learned:** sequence logos from its CNN filters, matched to JASPAR, plus a test of which explanation method finds the real binding site best (`ml/interpret.py`).
 - **DNA tutor chatbot:** explains DNA, transcription factors, the model and your own result in Beginner or Advanced mode.
@@ -33,7 +33,7 @@ The website reaches the backend through `/api`, which `frontend/vite.config.js` 
 
 **To stop:** press **Ctrl+C** in both terminals. Nothing keeps running afterwards.
 
-**Laptop-friendly:** the website only *uses* trained models; it never trains. PyTorch is limited to 2 CPU threads (`TORCH_NUM_THREADS`). The 3D view only redraws when you interact with it.
+**Laptop-friendly:** the website only *uses* trained models; it never trains. Inference uses CUDA or Apple MPS when available, with a CPU fallback. PyTorch CPU threads are limited by `TORCH_NUM_THREADS` (default 2). The 3D view only redraws when you interact with it.
 
 ## Train the models (Google Colab)
 
@@ -41,7 +41,7 @@ Training happens in Google Colab, not on laptops. Open `notebooks/train_all_mode
 
 1. downloads the FOSL2 dataset and cleans it with `ml/prepare_dataset.py`;
 2. downloads the JASPAR motif database (`ml/motifs.py`);
-3. trains all five methods on **identical data** with **5-fold cross-validation** (`ml/train_all.py`);
+3. trains all eight methods on **identical data** with **5-fold cross-validation** (`ml/train_all.py`);
 4. picks the yes/no cut-off on validation data and scores the untouched test set (AUROC, PR-AUC, accuracy, precision, recall, F1, MCC, ROC curves);
 5. explains the trained model: filter logos + JASPAR matches + explanation-method comparison (`ml/interpret.py`);
 6. checks the website backend with the new model, and zips everything as `TFBS_results.zip`.
@@ -51,6 +51,8 @@ The website uses the trained models in `ml/models/trained/`. By default it runs 
 ```bash
 TFBS_MODEL_KEY=cnn_bilstm uvicorn api:app --host 127.0.0.1 --port 8001
 ```
+
+New training runs record SHA-256 hashes for the raw and cleaned splits in their results and checkpoints. The API only displays a test AUROC when a fingerprinted checkpoint matches the selected results file. Legacy checkpoints without fingerprints continue to use their packaged run results. Set `TFBS_RESULTS_JSON` to compare a newly trained model. Raw and processed CSVs are ignored by Git and must be obtained from the benchmark source.
 
 **More ENCODE datasets:** `ml/build_encode_dataset.py` rebuilds any of the 165 benchmark datasets listed in `ml/datasets_165.txt` from the original ENCODE peak files (UCSC, hg19). Run it in Colab, not on a laptop (it downloads the 800 MB genome).
 

@@ -29,6 +29,7 @@ Usage (from the ml/ folder):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 import time
@@ -78,6 +79,21 @@ def load_split(path: Path) -> tuple[np.ndarray, np.ndarray]:
     sequences = frame["sequence"].astype(str).str.strip().str.upper().to_numpy()
     labels = frame["label"].astype(int).to_numpy()
     return sequences, labels
+
+
+def dataset_hashes(data_dir: Path) -> tuple[dict[str, str], str]:
+    """Fingerprint raw and cleaned CSVs so a checkpoint is tied to its source data."""
+    hashes = {
+        name: hashlib.sha256((data_dir / name).read_bytes()).hexdigest()
+        for name in ("train_clean.csv", "test_clean.csv")
+    }
+    raw_dir = data_dir.parent / "raw"
+    for name in ("train.csv", "test.csv"):
+        path = raw_dir / name
+        if path.is_file():
+            hashes[f"raw/{name}"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    fingerprint = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
+    return hashes, fingerprint
 
 
 def encode_all(sequences: np.ndarray) -> torch.Tensor:
@@ -211,7 +227,7 @@ def save_progress(out_dir: Path, runs: dict, config: dict) -> dict:
     return summary
 
 
-def export_final_models(out_dir: Path, runs: dict) -> None:
+def export_final_models(out_dir: Path, runs: dict, config: dict) -> None:
     """For each model keep the fold with the best *validation* AUROC (never pick by test score)."""
     final_dir = out_dir / "final_models"
     final_dir.mkdir(exist_ok=True)
@@ -229,6 +245,13 @@ def export_final_models(out_dir: Path, runs: dict) -> None:
         torch.save(ckpt, target)
         chosen[key] = {"fold": best["fold"], "threshold": best["threshold"], "file": target.name}
     (final_dir / "chosen_folds.json").write_text(json.dumps(chosen, indent=2), encoding="utf-8")
+    (final_dir / "dataset.json").write_text(json.dumps({
+        "source": config["dataset_source"],
+        "sha256": config["dataset_sha256"],
+        "fingerprint": config["dataset_fingerprint"],
+        "train_size": config["train_size"],
+        "test_size": config["test_size"],
+    }, indent=2), encoding="utf-8")
     # The model for the website = deep model with the best MEAN VALIDATION AUROC (test set never used)
     deep = {k: np.mean([f["validation"]["roc_auc"] for f in folds.values() if "validation" in f])
             for k, folds in runs.items() if k in MODELS and k in chosen}
@@ -238,6 +261,7 @@ def export_final_models(out_dir: Path, runs: dict) -> None:
             "model_type": best_key, "name": MODELS[best_key], "file": chosen[best_key]["file"],
             "mean_validation_auroc": deep[best_key],
             "all_mean_validation_auroc": deep,
+            "dataset_fingerprint": config["dataset_fingerprint"],
         }, indent=2), encoding="utf-8")
 
 
@@ -331,6 +355,7 @@ def run(args) -> dict:
     test_seq, test_y = load_split(data_dir / "test_clean.csv")
     if set(train_seq) & set(test_seq):
         raise ValueError("Some sequences appear in both train and test. Fix the data first.")
+    data_sha256, data_fingerprint = dataset_hashes(data_dir)
 
     if args.quick:
         rng = np.random.default_rng(args.seed)
@@ -353,6 +378,8 @@ def run(args) -> dict:
         "rc_augment": not args.no_rc, "early_stopping": "validation AUROC",
         "train_size": int(len(train_y)), "test_size": int(len(test_y)),
         "sequence_length": SEQUENCE_LENGTH, "models": models, "tf": args.tf,
+        "dataset_sha256": data_sha256, "dataset_fingerprint": data_fingerprint,
+        "dataset_source": "BERT-TFBS FOSL2 HepG2 benchmark",
     }
     results_path = out_dir / "cv_results.json"
     runs = {}
@@ -393,7 +420,9 @@ def run(args) -> dict:
 
             checkpoint = out_dir / "checkpoints" / f"{key}_fold{fold}.pth"
             torch.save({"model_type": key, "model_kwargs": {}, "model_state_dict": model.state_dict(),
-                        "sequence_length": SEQUENCE_LENGTH, "fold": fold, "random_seed": seed}, checkpoint)
+                        "sequence_length": SEQUENCE_LENGTH, "fold": fold, "random_seed": seed,
+                        "dataset_sha256": config["dataset_sha256"],
+                        "dataset_fingerprint": config["dataset_fingerprint"]}, checkpoint)
 
             val_prob = predict_probabilities(model, val_loader)
             test_prob = predict_probabilities(model, test_loader)
@@ -415,7 +444,7 @@ def run(args) -> dict:
             print(f"{name} fold {fold}: test AUROC {t['roc_auc']:.3f}, F1 {t['f1']:.3f} (cut-off {threshold})")
 
     summary = save_progress(out_dir, runs, config)
-    export_final_models(out_dir, runs)
+    export_final_models(out_dir, runs, config)
     plot_roc_curves(out_dir, runs, test_y)
     print("\n" + markdown_table(summary))
     return summary
